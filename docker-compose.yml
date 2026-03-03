@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./summaries:/app/summaries
+      - ./db:/app/db
+      - ./logs:/app/logs
+      - ./app:/app/app  # 開発時のホットリロード用
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tokyo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

@@ -1,0 +1,54 @@
+<!--
+  汎用記事セクション (article_section.html)
+  必要変数:
+    section_id    : "cv", "lg", ...
+    section_icon  : 絵文字
+    section_title : セクション見出し
+    items         : ArticleItem のリスト
+    is_paper      : true=論文 / false=記事
+    subsection    : true=サブセクション / false=メインセクション（デフォルト）
+-->
+<section class="mb-6" x-data="{open: true}" id="section-{{ section_id }}">
+
+  {% if subsection %}
+  <!-- サブセクション見出し（小） -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3 hover:bg-indigo-100 transition">
+    <div class="flex items-center gap-2">
+      <span class="text-lg">{{ section_icon }}</span>
+      <h3 class="font-semibold text-base text-indigo-900">{{ section_title }}</h3>
+      <span class="text-xs text-indigo-400 bg-indigo-100 px-2 py-0.5 rounded-full">{{ items|length }} 件</span>
+    </div>
+    <span x-text="open ? '▲' : '▼'" class="text-indigo-300 text-sm"></span>
+  </button>
+
+  {% else %}
+  <!-- メインセクション見出し（大） -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between
+      {% if section_id == 'cv' %}bg-gradient-to-r from-orange-700 to-orange-500
+      {% elif section_id == 'industry' %}bg-gradient-to-r from-slate-700 to-slate-500
+      {% elif section_id == 'community' %}bg-gradient-to-r from-teal-700 to-teal-500
+      {% elif section_id == 'python' %}bg-gradient-to-r from-emerald-700 to-emerald-500
+      {% else %}bg-gradient-to-r from-blue-800 to-blue-600{% endif %}
+      text-white px-4 sm:px-6 py-4 sm:py-5">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl sm:text-3xl">{{ section_icon }}</span>
+        <div class="text-left">
+          <h2 class="font-bold text-lg sm:text-xl">{{ section_title }}</h2>
+          <p class="text-white/60 text-xs mt-0.5 text-left">{{ items|length }} 件</p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="text-white/50 text-lg"></span>
+    </div>
+  </button>
+  {% endif %}
+
+  <div x-show="open" x-cloak class="mt-2 space-y-3">
+    {% for item in items %}
+    {% include "components/article_card.html" %}
+    {% endfor %}
+  </div>
+
+</section>

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}エラー {{ status_code }} — AI Daily Survey{% endblock %}
+
+{% block content %}
+<div class="text-center py-20">
+  <p class="text-6xl font-bold text-gray-300 mb-4">{{ status_code }}</p>
+  <p class="text-xl text-gray-600 mb-6">{{ message }}</p>
+  <a href="/" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+    トップに戻る
+  </a>
+</div>
+{% endblock %}

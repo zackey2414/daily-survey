@@ -1,0 +1,7 @@
+<!--
+  HTMX で append されるメッセージ断片 (chat_messages.html)
+  必要変数: messages (list[ChatMessage])
+-->
+{% for msg in messages %}
+{% include "components/chat_message_item.html" %}
+{% endfor %}

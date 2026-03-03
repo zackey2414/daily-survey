@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ date_str }} まとめ — AI Daily Survey{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex items-center gap-3">
+  <a href="/summaries" class="text-blue-600 hover:underline text-sm">← まとめ履歴</a>
+  <span class="text-gray-300">|</span>
+  <a href="/archive/{{ date_str }}" class="text-blue-600 hover:underline text-sm">
+    {{ date_str }} の記事一覧 →
+  </a>
+</div>
+
+<article class="bg-white rounded-xl border shadow-sm overflow-hidden">
+  <div class="bg-blue-900 text-white px-6 py-4">
+    <h1 class="text-xl font-bold">{{ date_str }} AI 動向まとめ</h1>
+  </div>
+  <div class="px-6 py-6 prose max-w-none text-gray-800">
+    {{ content_html | safe }}
+  </div>
+</article>
+{% endblock %}

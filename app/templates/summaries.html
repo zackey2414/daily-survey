@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}まとめ履歴 — AI Daily Survey{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-800">📚 まとめ履歴</h1>
+  <p class="text-gray-500 text-sm mt-1">日次の一面まとめ一覧</p>
+</div>
+
+<!-- ビュー切り替えボタン -->
+<div x-data="{ view: 'latest' }" class="mb-6">
+  <div class="flex gap-2 mb-5">
+    <button @click="view = 'latest'"
+            :class="view === 'latest' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">
+      最新 3日分
+    </button>
+    <button @click="view = 'all'"
+            :class="view === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">
+      全件一覧
+    </button>
+  </div>
+
+  <!-- 最新3日分ビュー -->
+  <div x-show="view === 'latest'" x-cloak class="space-y-6">
+    {% for meta in latest_3 %}
+    <article class="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition">
+      <div class="bg-blue-900 text-white px-5 py-3 flex items-center justify-between">
+        <h2 class="font-bold">{{ meta.date }}</h2>
+        <a href="/summaries/{{ meta.date }}" class="text-blue-200 text-sm hover:text-white">
+          全文を読む →
+        </a>
+      </div>
+      <div class="px-5 py-4">
+        <h3 class="font-semibold text-gray-800 mb-2">{{ meta.title }}</h3>
+        <p class="text-gray-600 text-sm leading-relaxed">{{ meta.preview }}</p>
+        <a href="/summaries/{{ meta.date }}"
+           class="inline-block mt-3 text-blue-600 text-sm hover:underline">
+          続きを読む →
+        </a>
+      </div>
+    </article>
+    {% else %}
+    <div class="text-center py-12 text-gray-400">
+      <p class="text-4xl mb-3">📭</p>
+      <p>まだダイジェストがありません</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- 全件一覧ビュー -->
+  <div x-show="view === 'all'" x-cloak x-data="{ listMode: 'list' }">
+    <div class="flex gap-2 mb-4">
+      <button @click="listMode = 'list'"
+              :class="listMode === 'list' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 border'"
+              class="px-3 py-1 rounded text-sm transition">
+        リスト
+      </button>
+      <button @click="listMode = 'calendar'"
+              :class="listMode === 'calendar' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 border'"
+              class="px-3 py-1 rounded text-sm transition">
+        カレンダー
+      </button>
+    </div>
+
+    <!-- リスト表示 -->
+    <div x-show="listMode === 'list'" class="bg-white rounded-xl border shadow-sm divide-y">
+      {% for meta in metas %}
+      <a href="/summaries/{{ meta.date }}"
+         class="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 hover:bg-blue-50 transition">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-0 min-w-0">
+          <span class="font-mono text-xs sm:text-sm text-gray-600 shrink-0">{{ meta.date }}</span>
+          <span class="sm:ml-3 text-gray-800 text-sm truncate">{{ meta.title }}</span>
+        </div>
+        <span class="text-blue-500 text-sm shrink-0">→</span>
+      </a>
+      {% else %}
+      <p class="px-5 py-6 text-gray-400 text-sm text-center">データがありません</p>
+      {% endfor %}
+    </div>
+
+    <!-- カレンダー表示 -->
+    <div x-show="listMode === 'calendar'" class="bg-white rounded-xl border shadow-sm p-5">
+      {% if metas %}
+      {% set dates_by_month = {} %}
+      {% for meta in metas %}
+        {% set ym = meta.date[:7] %}
+        {% if ym not in dates_by_month %}{% set _ = dates_by_month.update({ym: []}) %}{% endif %}
+        {% set _ = dates_by_month[ym].append(meta) %}
+      {% endfor %}
+
+      {% for ym, month_metas in dates_by_month.items() %}
+      <div class="mb-6">
+        <h3 class="font-bold text-gray-700 mb-3">{{ ym }}</h3>
+        <div class="flex flex-wrap gap-2">
+          {% for meta in month_metas %}
+          <a href="/summaries/{{ meta.date }}"
+             class="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm hover:bg-blue-200 transition">
+            {{ meta.date[8:] }}日
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="text-gray-400 text-sm text-center py-6">データがありません</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+<!--
+  チャットメッセージ 1件 (chat_message_item.html)
+  必要変数: msg (ChatMessage)
+-->
+<div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+  <div class="max-w-[85%] rounded-xl px-4 py-2 text-sm leading-relaxed
+    {% if msg.role == 'user' %}
+      bg-blue-600 text-white
+    {% else %}
+      bg-gray-100 text-gray-800
+    {% endif %}">
+    {{ msg.content | replace('\n', '<br>') | safe }}
+  </div>
+</div>

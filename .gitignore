@@ -1,0 +1,36 @@
+# 環境変数
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# 仮想環境
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+
+# 収集データ・DB・ログ・サマリー
+data/
+db/
+logs/
+summaries/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}AI Daily Survey{% endblock %}</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <!-- Alpine.js -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .prose h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .prose h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; color: #1e40af; }
+    .prose h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+    .prose ul { list-style: disc; padding-left: 1.5rem; }
+    .prose li { margin-bottom: 0.25rem; }
+    .prose p { margin-bottom: 0.75rem; line-height: 1.7; }
+    .prose strong { font-weight: 700; }
+    .chat-messages { max-height: 400px; overflow-y: auto; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+<!-- ナビゲーションバー -->
+<nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a href="/" class="text-xl font-bold tracking-tight hover:text-blue-200 transition">
+      📰 AI Daily Survey
+    </a>
+    <div class="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+      <a href="/" class="hover:text-blue-200 transition {% if request.url.path == '/' %}text-blue-200 font-semibold{% endif %}">
+        今日
+      </a>
+      <a href="/summaries" class="hover:text-blue-200 transition {% if request.url.path.startswith('/summaries') %}text-blue-200 font-semibold{% endif %}">
+        まとめ履歴
+      </a>
+      <a href="/tags" class="hover:text-blue-200 transition {% if request.url.path.startswith('/tags') %}text-blue-200 font-semibold{% endif %}">
+        タグ
+      </a>
+      <a href="/chat/search" class="hover:text-blue-200 transition {% if request.url.path.startswith('/chat/search') %}text-blue-200 font-semibold{% endif %}">
+        チャット一覧
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- メインコンテンツ -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- フッター -->
+<footer class="mt-12 py-6 bg-gray-800 text-gray-400 text-center text-sm">
+  <p>AI Daily Survey — 毎朝 09:00 自動更新</p>
+</footer>
+
+</body>
+</html>
