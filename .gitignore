@@ -32,5 +32,8 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code ローカル設定（個人の開発環境固有）
+.claude/
+
 # Git
 .git/

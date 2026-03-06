@@ -54,6 +54,22 @@ class Settings:
         "Alibaba": "https://www.alibabacloud.com/blog/feed/tag/ai",
     }
 
+    # 海外ニュースメディア RSS（AI企業関連報道収集用）
+    news_rss_feeds: list[str] = [
+        "https://feeds.bbci.co.uk/news/technology/rss.xml",
+        "https://techcrunch.com/feed/",
+        "https://www.theverge.com/rss/index.xml",
+        "https://www.wired.com/feed/tag/artificial-intelligence/rss",
+    ]
+    news_max_results: int = 15
+    # フィルタリングキーワード（AI企業・製品名）
+    news_filter_keywords: list[str] = [
+        "OpenAI", "Google", "Anthropic", "Meta", "Amazon",
+        "Microsoft", "Alibaba", "xAI", "Grok", "ChatGPT",
+        "Gemini", "Claude", "Copilot", "GPT", "DeepMind",
+        "Llama", "Mistral", "Cohere", "Perplexity",
+    ]
+
     # OpenReview 対象学会
     openreview_venues: list[str] = [
         "CVPR", "NeurIPS", "ICLR", "ICCV", "ICML",

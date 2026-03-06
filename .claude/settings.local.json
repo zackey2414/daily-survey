@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(source .env:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(grep:*)",
+      "Bash(docker compose:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(sudo chown:*)",
+      "Bash(python:*)"
     ]
   }
 }

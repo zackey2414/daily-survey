@@ -1,0 +1,24 @@
+<!--
+  ユーザータグ一覧コンポーネント (user_tags.html)
+  必要変数: article_id, safe_id, user_tags (list[str])
+  Alpine スコープ: deleteMode (親カードから)
+-->
+{% for tag in user_tags %}
+<div class="relative inline-flex items-center">
+  <a href="/tags/{{ tag }}"
+     class="text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 px-2.5 py-0.5 rounded-full hover:bg-emerald-100 transition-colors">
+    #{{ tag }}
+  </a>
+  <button
+    x-show="deleteMode"
+    x-cloak
+    @click="if(confirm('タグ「{{ tag }}」を削除しますか？')) htmx.trigger($el, 'confirmed-delete')"
+    hx-delete="/user-tags/{{ article_id }}/{{ tag }}"
+    hx-target="#user-tags-{{ safe_id }}"
+    hx-swap="innerHTML"
+    hx-trigger="confirmed-delete"
+    class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] leading-none flex items-center justify-center hover:bg-red-600 transition-colors z-10">
+    ×
+  </button>
+</div>
+{% endfor %}

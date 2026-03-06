@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}まとめ履歴 — AI Daily Survey{% endblock %}
+
+{% block content %}
+<div class="mb-7 flex items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-800">まとめ履歴</h1>
+    <p class="text-slate-500 text-sm mt-1">全 {{ total }} 件 — 最新から降順</p>
+  </div>
+</div>
+
+{% if metas %}
+<div class="space-y-5">
+  {% for meta in metas %}
+  <article class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-200">
+    <div class="flex items-center justify-between px-5 py-3.5"
+         style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #312e81 100%);">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="text-white/70 text-xs font-mono shrink-0">{{ meta.date }}</span>
+        <span class="w-1 h-1 rounded-full bg-white/30 shrink-0"></span>
+        <span class="text-white font-semibold text-sm truncate">{{ meta.title }}</span>
+      </div>
+      <a href="/summaries/{{ meta.date }}"
+         class="shrink-0 text-xs text-blue-300 hover:text-white font-medium transition-colors ml-3">
+        全文 →
+      </a>
+    </div>
+    <div class="px-5 py-4">
+      <p class="text-slate-600 text-sm leading-relaxed line-clamp-3">{{ meta.preview }}</p>
+      <a href="/summaries/{{ meta.date }}"
+         class="inline-flex items-center gap-1 mt-3 text-indigo-600 text-sm font-medium hover:text-indigo-700 transition-colors">
+        続きを読む <span class="text-base leading-none">→</span>
+      </a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+<!-- ページネーション -->
+{% if total_pages > 1 %}
+<nav class="mt-8 flex items-center justify-center gap-1.5">
+  {% if page > 1 %}
+  <a href="/summaries?page={{ page - 1 }}"
+     class="px-3 py-1.5 text-sm font-medium bg-white ring-1 ring-gray-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+    ← 前へ
+  </a>
+  {% else %}
+  <span class="px-3 py-1.5 text-sm font-medium text-slate-300 bg-white ring-1 ring-gray-100 rounded-lg cursor-default">
+    ← 前へ
+  </span>
+  {% endif %}
+
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="px-3 py-1.5 text-sm font-semibold bg-slate-800 text-white rounded-lg">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+    <a href="/summaries?page={{ p }}"
+       class="px-3 py-1.5 text-sm font-medium bg-white ring-1 ring-gray-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+      {{ p }}
+    </a>
+    {% elif p == page - 3 or p == page + 3 %}
+    <span class="px-1 text-slate-400 text-sm">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if page < total_pages %}
+  <a href="/summaries?page={{ page + 1 }}"
+     class="px-3 py-1.5 text-sm font-medium bg-white ring-1 ring-gray-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+    次へ →
+  </a>
+  {% else %}
+  <span class="px-3 py-1.5 text-sm font-medium text-slate-300 bg-white ring-1 ring-gray-100 rounded-lg cursor-default">
+    次へ →
+  </span>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-16 text-slate-400">
+  <p class="text-5xl mb-4">📭</p>
+  <p class="font-medium">まだダイジェストがありません</p>
+  <p class="text-sm mt-1">毎朝 09:00 の収集後に自動生成されます</p>
+</div>
+{% endif %}
+
+{% endblock %}

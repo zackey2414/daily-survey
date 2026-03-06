@@ -1,32 +1,41 @@
 """
 サマリー履歴フィードページルーター
-- /summaries        : 最新3日分 / 全件一覧ビュー
+- /summaries        : 全一面まとめを降順・ページネーション表示（10件/ページ）
 - /summaries/{date} : 特定日のダイジェスト詳細
 """
 import markdown as md
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
-from app.services.digest import load_digest, list_digests
+from app.jinja import templates
+from app.services.digest import load_digest, list_digests, inject_citations
 from app.schemas import DailySummaryMeta
 
 router = APIRouter(prefix="/summaries")
-templates = Jinja2Templates(directory="app/templates")
+
+PER_PAGE = 10
 
 
 @router.get("/", response_class=HTMLResponse)
-async def summaries_list(request: Request):
-    all_dates = list_digests()
+async def summaries_list(request: Request, page: int = Query(default=1, ge=1)):
+    all_dates = list_digests()   # 降順（最新が先頭）
     metas = _build_metas(all_dates)
-    latest_3 = metas[:3]
+
+    total = len(metas)
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    page = min(page, total_pages)
+
+    start = (page - 1) * PER_PAGE
+    page_metas = metas[start : start + PER_PAGE]
 
     return templates.TemplateResponse(
-        "summaries.html",
+        "pages/summaries.html",
         {
             "request": request,
-            "metas": metas,
-            "latest_3": latest_3,
+            "metas": page_metas,
+            "page": page,
+            "total_pages": total_pages,
+            "total": total,
         },
     )
 
@@ -43,13 +52,14 @@ async def summary_detail(request: Request, date_str: str):
     if content is None:
         raise HTTPException(status_code=404, detail=f"{date_str} のダイジェストが見つかりません。")
 
+    processed = inject_citations(content, date_str, is_archive=False)
     html_content = md.markdown(
-        content,
+        processed,
         extensions=["fenced_code", "tables", "toc", "nl2br"],
     )
 
     return templates.TemplateResponse(
-        "summary_detail.html",
+        "pages/summary_detail.html",
         {
             "request": request,
             "date_str": date_str,

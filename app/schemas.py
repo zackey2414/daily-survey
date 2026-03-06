@@ -15,7 +15,9 @@ class ArticleItem(BaseModel):
     abstract_en: str = ""
     summary_ja: str = ""        # LLM 生成の日本語要約
     novelty_ja: str = ""        # 論文の場合: 新規性・貢献の説明
+    meta_learning_ja: str = "" # 論文のメタ的な学び（問題定義・手法・評価のメタ視点）
     key_points_ja: list[str] = []  # 記事・ニュースの場合: ポイント箇条書き
+    quantitative_metrics_ja: str = ""  # 企業動向の場合: 定量指標（ベンチマーク名・スコア・改善率など）
     published_date: str = ""    # "YYYY-MM-DD"
     url: str = ""
     pdf_url: str = ""
@@ -35,8 +37,8 @@ class DailyCollection(BaseModel):
     date: str                   # "YYYY-MM-DD" (収集対象日 = 前日 JST)
     collection_date: str = ""   # "YYYY-MM-DD" (収集実行日 JST, ディレクトリ名と同じ)
     category: Literal[
-        "cv", "lg", "ai", "cl",
-        "industry", "community", "python"
+        "cv", "openreview", "lg", "ai", "cl",
+        "industry", "industry_news", "community", "python"
     ]
     collected_at: str           # ISO 8601 収集実行日時 (JST)
     total: int = 0

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}{{ date_str }} — AI Daily Survey{% endblock %}
+
+{% block content %}
+<!-- ページヘッダー -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">先日の AI 動向</h1>
+    <p class="text-slate-400 text-xs mt-1">
+      対象: <span class="text-slate-500">{{ target_date_str }}</span>
+      <span class="mx-1.5">·</span>
+      収集: <span class="text-slate-500">{{ date_str }}</span>
+    </p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <select onchange="location.href='/archive/' + this.value"
+            class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer text-slate-700">
+      {% for d in available_dates %}
+      <option value="{{ d }}" {% if d == date_str %}selected{% endif %}>{{ d }}</option>
+      {% endfor %}
+    </select>
+    <button
+      hx-post="/admin/run-pipeline"
+      hx-confirm="パイプラインを手動実行しますか？"
+      hx-target="#pipeline-status"
+      class="inline-flex items-center gap-1.5 bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm">
+      ▶ 今すぐ収集
+    </button>
+    <span id="pipeline-status" class="text-xs text-slate-500"></span>
+  </div>
+</div>
+
+<!-- ① 一面まとめ -->
+{% if digest_html %}
+<section class="mb-10 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+  <div class="flex items-center gap-3 px-5 sm:px-6 py-4"
+       style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);">
+    <span class="text-xl bg-white/15 p-2 rounded-xl leading-none">🗞️</span>
+    <h2 class="font-bold text-lg text-white tracking-tight">本日の一面まとめ</h2>
+  </div>
+  <div class="px-4 sm:px-6 py-5 sm:py-6 prose prose-blue max-w-none text-gray-800 leading-relaxed">
+    {{ digest_html | safe }}
+  </div>
+</section>
+{% else %}
+<div class="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-amber-800 text-sm">
+  まだ {{ date_str }} のデータはありません。「今すぐ収集」ボタンを押すか、翌朝 09:00 の自動実行をお待ちください。
+</div>
+{% endif %}
+
+<!-- ② CV 関連論文（親セクション） -->
+{% if cv_papers or openreview_papers %}
+<section class="mb-8" x-data="{open: false}" id="section-cv-parent"
+         data-section-icon="🖼️" data-section-title="CV 関連論文">
+  <!-- 大見出し -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between relative overflow-hidden text-white px-4 sm:px-6 py-4 sm:py-5"
+         style="background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);">
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">🖼️</span>
+        <div class="text-left">
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">CV 関連論文</h2>
+          <p class="text-orange-200 text-xs mt-0.5">
+            OpenReview: {{ openreview_papers|length }} 件 · arXiv cs.CV: {{ cv_papers|length }} 件
+          </p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="relative text-orange-300 text-base"></span>
+    </div>
+  </button>
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="mt-2 space-y-2 pl-2">
+    {% if openreview_papers %}
+    {% set section_id = "openreview" %}{% set section_icon = "📋" %}{% set section_title = "OpenReview" %}
+    {% set items = openreview_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+    {% if cv_papers %}
+    {% set section_id = "cv" %}{% set section_icon = "🖼️" %}{% set section_title = "arXiv cs.CV" %}
+    {% set items = cv_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ③ AI 全般論文（親セクション） -->
+{% if lg_papers or ai_papers or cl_papers %}
+<section class="mb-8" x-data="{open: false}" id="section-ai-general"
+         data-section-icon="🧠" data-section-title="AI 全般論文">
+  <!-- 大見出し -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between relative overflow-hidden text-white px-4 sm:px-6 py-4 sm:py-5"
+         style="background: linear-gradient(135deg, #312e81 0%, #4338ca 100%);">
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">🧠</span>
+        <div class="text-left">
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">AI 全般論文</h2>
+          <p class="text-indigo-200 text-xs mt-0.5">
+            cs.LG: {{ lg_papers|length }} 件 · cs.AI: {{ ai_papers|length }} 件 · cs.CL: {{ cl_papers|length }} 件
+          </p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="relative text-indigo-300 text-base"></span>
+    </div>
+  </button>
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="mt-2 space-y-2 pl-2">
+    {% if lg_papers %}
+    {% set section_id = "lg" %}{% set section_icon = "📈" %}{% set section_title = "機械学習（cs.LG）" %}
+    {% set items = lg_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+    {% if ai_papers %}
+    {% set section_id = "ai" %}{% set section_icon = "🤖" %}{% set section_title = "人工知能（cs.AI）" %}
+    {% set items = ai_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+    {% if cl_papers %}
+    {% set section_id = "cl" %}{% set section_icon = "💬" %}{% set section_title = "自然言語処理（cs.CL）" %}
+    {% set items = cl_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ④ AI 企業動向（自社発表 + その他報道 を親セクションでまとめる） -->
+{% if industry_items or industry_news_items %}
+<section class="mb-8" x-data="{open: false}" id="section-industry-parent"
+         data-section-icon="🏢" data-section-title="AI 企業動向">
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between relative overflow-hidden text-white px-4 sm:px-6 py-4 sm:py-5"
+         style="background: linear-gradient(135deg, #1e293b 0%, #475569 100%);">
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">🏢</span>
+        <div class="text-left">
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">AI 企業動向</h2>
+          <p class="text-slate-300 text-xs mt-0.5">
+            自社発表: {{ industry_items|length }} 件 · その他報道: {{ industry_news_items|length }} 件
+          </p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="relative text-slate-400 text-base"></span>
+    </div>
+  </button>
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="mt-2 space-y-2 pl-2">
+    {% if industry_items %}
+    {% set section_id = "industry" %}{% set section_icon = "🏢" %}{% set section_title = "自社発表" %}
+    {% set items = industry_items %}{% set is_paper = false %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+    {% if industry_news_items %}
+    {% set section_id = "industry_news" %}{% set section_icon = "📰" %}{% set section_title = "その他報道" %}
+    {% set items = industry_news_items %}{% set is_paper = false %}{% set subsection = true %}
+    {% include "components/article/section.html" %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ⑤ SNS・コミュニティ -->
+{% if community_items %}
+{% set section_id = "community" %}
+{% set section_icon = "🗣️" %}
+{% set section_title = "SNS・コミュニティ（Qiita / Zenn / Reddit）" %}
+{% set items = community_items %}
+{% set is_paper = false %}
+{% set subsection = false %}
+{% include "components/article/section.html" %}
+{% endif %}
+
+<!-- ⑥ Python 情報 -->
+{% if python_items %}
+{% set section_id = "python" %}
+{% set section_icon = "🐍" %}
+{% set section_title = "Python 情報（GitHub Trending）" %}
+{% set items = python_items %}
+{% set is_paper = false %}
+{% set subsection = false %}
+{% include "components/article/section.html" %}
+{% endif %}
+
+{% if not (cv_papers or openreview_papers or lg_papers or ai_papers or cl_papers or industry_items or industry_news_items or community_items or python_items) %}
+<div class="text-center py-20 text-gray-400">
+  <p class="text-5xl mb-4">📭</p>
+  <p class="text-lg font-medium text-slate-500">{{ date_str }} のデータがまだありません</p>
+  <p class="text-sm text-slate-400 mt-1">「今すぐ収集」で手動実行できます</p>
+</div>
+{% endif %}
+
+{% endblock %}

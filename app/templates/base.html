@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AI Daily Survey{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗞️</text></svg>">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- HTMX -->
@@ -11,51 +16,431 @@
   <!-- Alpine.js -->
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
+    *, body { font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif; }
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #f1f5f9;
+    }
     [x-cloak] { display: none !important; }
+
+    /* カードホバー */
+    .card {
+      transition: transform 0.18s cubic-bezier(.22,.68,0,1.2), box-shadow 0.18s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Prose スタイル */
     .prose h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
-    .prose h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; color: #1e40af; }
-    .prose h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+    .prose h2 { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: #1e40af; border-bottom: 1px solid #dbeafe; padding-bottom: 0.3rem; }
+    .prose h3 { font-size: 1.0rem; font-weight: 600; margin: 1rem 0 0.3rem; color: #374151; }
     .prose ul { list-style: disc; padding-left: 1.5rem; }
-    .prose li { margin-bottom: 0.25rem; }
-    .prose p { margin-bottom: 0.75rem; line-height: 1.7; }
-    .prose strong { font-weight: 700; }
+    .prose ol { list-style: decimal; padding-left: 1.5rem; }
+    .prose li { margin-bottom: 0.35rem; line-height: 1.75; }
+    .prose p { margin-bottom: 0.8rem; line-height: 1.85; }
+    .prose strong { font-weight: 700; color: #111827; }
+    .prose a { color: #2563eb; text-decoration: underline; text-decoration-color: #bfdbfe; text-underline-offset: 2px; transition: text-decoration-color 0.15s; }
+    .prose a:hover { text-decoration-color: #2563eb; }
+    .prose code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: #475569; }
+    .prose blockquote { border-left: 3px solid #c7d2fe; padding-left: 1rem; color: #6b7280; margin: 0.75rem 0; font-style: italic; }
+
+    /* チャット */
     .chat-messages { max-height: 400px; overflow-y: auto; }
+
+    /* アニメーション */
+    [x-show] { transition-property: opacity, transform; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body class="text-gray-900 min-h-screen">
 
 <!-- ナビゲーションバー -->
-<nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-    <a href="/" class="text-xl font-bold tracking-tight hover:text-blue-200 transition">
-      📰 AI Daily Survey
+<nav class="sticky top-0 z-50 border-b border-white/10"
+     style="background: rgba(10, 15, 30, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 group">
+      <span class="text-lg leading-none">📰</span>
+      <span class="font-bold text-sm sm:text-base text-white tracking-tight group-hover:text-blue-300 transition-colors">AI Daily Survey</span>
     </a>
-    <div class="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-      <a href="/" class="hover:text-blue-200 transition {% if request.url.path == '/' %}text-blue-200 font-semibold{% endif %}">
+    <nav class="flex items-center gap-1 text-sm">
+      <a href="/"
+         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+           {% if request.url.path == '/' or request.url.path.startswith('/archive') %}
+             bg-white/15 text-white
+           {% else %}
+             text-slate-400 hover:text-white hover:bg-white/10
+           {% endif %}">
         今日
       </a>
-      <a href="/summaries" class="hover:text-blue-200 transition {% if request.url.path.startswith('/summaries') %}text-blue-200 font-semibold{% endif %}">
-        まとめ履歴
+      <a href="/summaries"
+         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+           {% if request.url.path.startswith('/summaries') %}
+             bg-white/15 text-white
+           {% else %}
+             text-slate-400 hover:text-white hover:bg-white/10
+           {% endif %}">
+        まとめ
       </a>
-      <a href="/tags" class="hover:text-blue-200 transition {% if request.url.path.startswith('/tags') %}text-blue-200 font-semibold{% endif %}">
+      <a href="/tags"
+         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+           {% if request.url.path.startswith('/tags') %}
+             bg-white/15 text-white
+           {% else %}
+             text-slate-400 hover:text-white hover:bg-white/10
+           {% endif %}">
         タグ
       </a>
-      <a href="/chat/search" class="hover:text-blue-200 transition {% if request.url.path.startswith('/chat/search') %}text-blue-200 font-semibold{% endif %}">
-        チャット一覧
+      <a href="/chat/search"
+         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+           {% if request.url.path.startswith('/chat/search') %}
+             bg-white/15 text-white
+           {% else %}
+             text-slate-400 hover:text-white hover:bg-white/10
+           {% endif %}">
+        チャット
       </a>
-    </div>
+    </nav>
   </div>
 </nav>
 
 <!-- メインコンテンツ -->
-<main class="max-w-7xl mx-auto px-4 py-6">
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
   {% block content %}{% endblock %}
 </main>
 
 <!-- フッター -->
-<footer class="mt-12 py-6 bg-gray-800 text-gray-400 text-center text-sm">
-  <p>AI Daily Survey — 毎朝 09:00 自動更新</p>
+<footer class="mt-16 py-6 border-t border-slate-200">
+  <div class="text-center space-y-1">
+    <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
+    <p class="text-slate-400 text-xs">毎朝 09:00 JST 自動更新</p>
+  </div>
 </footer>
+
+<!-- セクションスティッキーブロック: 元のトグルボタンをクローンして上部からスライドイン -->
+<script>
+(function () {
+  var stickyWrap = null;
+  var NAV_H = 52;
+
+  function createWrap() {
+    stickyWrap = document.createElement('div');
+    stickyWrap.id = 'section-sticky-bar';
+    stickyWrap.style.cssText = [
+      'position:fixed',
+      'top:' + NAV_H + 'px',
+      'left:0',
+      'right:0',
+      'z-index:40',
+      'pointer-events:none',
+      'transform:translateY(-110%)',
+      'opacity:0',
+    ].join(';');
+    document.body.appendChild(stickyWrap);
+  }
+
+  // animated=false: 瞬時表示（sticky演出用）
+  function show() {
+    stickyWrap.style.transition = 'none';
+    stickyWrap.style.transform = 'translateY(0)';
+    stickyWrap.style.opacity = '1';
+    stickyWrap.style.pointerEvents = 'auto';
+  }
+
+  // animated=true: スライドアウト（次セクション接近時）/ false: 瞬時非表示（スクロール戻り時）
+  function hide(animated) {
+    if (animated) {
+      stickyWrap.style.transition = 'transform 0.32s cubic-bezier(0.22,1,0.36,1), opacity 0.22s ease';
+    } else {
+      stickyWrap.style.transition = 'none';
+    }
+    stickyWrap.style.transform = 'translateY(-110%)';
+    stickyWrap.style.opacity = '0';
+    stickyWrap.style.pointerEvents = 'none';
+  }
+
+  function isVisible(el) {
+    var p = el.parentElement;
+    while (p && p !== document.body) {
+      if (getComputedStyle(p).display === 'none') return false;
+      p = p.parentElement;
+    }
+    return true;
+  }
+
+  function closeSection(sEl) {
+    try { Alpine.$data(sEl).open = false; } catch (e) {}
+    sEl.querySelectorAll('section[data-section-title]').forEach(function (child) {
+      try { Alpine.$data(child).open = false; } catch (e) {}
+    });
+  }
+
+  // 元のボタンをクローンして Alpine ディレクティブを除去・矢印を ▲ に固定
+  function cloneBtn(sEl) {
+    var orig = sEl.querySelector(':scope > button');
+    if (!orig) return null;
+    var clone = orig.cloneNode(true);
+    // 矢印スパンを ▲ 固定（クリックで閉じるので常に ▲）
+    var arrow = clone.querySelector('[x-text]');
+    if (arrow) arrow.textContent = '▲';
+    // Alpine / イベントディレクティブを除去
+    [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (el) {
+      Array.from(el.attributes).slice().forEach(function (a) {
+        if (a.name.startsWith('x-') || a.name.startsWith('@')) el.removeAttribute(a.name);
+      });
+    });
+    clone.style.width = '100%';
+    clone.style.display = 'flex';
+    return clone;
+  }
+
+  function updateBar() {
+    if (!stickyWrap || !window.Alpine) return;
+
+    var sections = Array.from(document.querySelectorAll('section[data-section-title]'));
+
+    var active = sections.filter(function (s) {
+      var d = null;
+      try { d = Alpine.$data(s); } catch (e) { return false; }
+      if (!d || !d.open) return false;
+      if (!isVisible(s)) return false;
+      var btn = s.querySelector(':scope > button');
+      if (!btn) return false;
+      // サブセクションは親セクションのボタン高さぶん下を基準にする
+      var threshold = NAV_H;
+      var p = s.parentElement;
+      while (p && p !== document.body) {
+        if (p.tagName === 'SECTION' && p.hasAttribute('data-section-title')) {
+          var parentBtn = p.querySelector(':scope > button');
+          if (parentBtn) threshold += parentBtn.offsetHeight + 4;
+          break;
+        }
+        p = p.parentElement;
+      }
+      return btn.getBoundingClientRect().top < threshold;
+    });
+
+    if (active.length === 0) { hide(false); return; }  // スクロール戻り: 瞬時非表示
+
+    // DOM で最後の active = 現在ユーザーがいるセクション
+    var current = active[active.length - 1];
+    // current 自身 + current の DOM 祖先のみ（兄弟は除外）
+    var chain = active.filter(function (s) { return s === current || s.contains(current); });
+
+    var key = chain.map(function (s) { return s.id; }).join('|');
+
+    // コンテンツが変わった場合のみ再構築
+    if (stickyWrap.dataset.activeKey !== key) {
+      stickyWrap.dataset.activeKey = key;
+
+      // メインコンテンツと同幅になるよう main の padding を参照
+      var mainEl = document.querySelector('main');
+      var padL = mainEl ? getComputedStyle(mainEl).paddingLeft : '1rem';
+      var padR = mainEl ? getComputedStyle(mainEl).paddingRight : '1rem';
+
+      var inner = document.createElement('div');
+      inner.style.cssText = [
+        'max-width:80rem',
+        'margin:0 auto',
+        'padding-left:' + padL,
+        'padding-right:' + padR,
+        'padding-bottom:4px',
+        'display:flex',
+        'flex-direction:column',
+        'gap:4px',
+      ].join(';');
+
+      // chain[0] = メインクローン（サブより前面に描画 z-index:1）
+      // chain[1+] = サブクローン（data-sub-wrap にまとめ、メインの裏に押し上げ可能）
+      var subWrapRef = null;
+      chain.forEach(function (sec, idx) {
+        var block = cloneBtn(sec);
+        if (!block) return;
+        (function (sEl, bl) {
+          bl.addEventListener('click', function () {
+            closeSection(sEl);
+            setTimeout(function () {
+              var hdr = sEl.querySelector(':scope > button');
+              if (hdr) {
+                var top = hdr.getBoundingClientRect().top + window.scrollY - (NAV_H + 8);
+                window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+              }
+              stickyWrap.dataset.activeKey = '';
+              updateBar();
+            }, 160);
+          });
+        })(sec, block);
+
+        if (idx === 0) {
+          // メインクローン: z-index を上げてサブが裏に潜れるようにする
+          block.style.position = 'relative';
+          block.style.zIndex = '1';
+          inner.appendChild(block);
+        } else {
+          // サブクローン: data-sub-wrap にまとめる
+          if (!subWrapRef) {
+            subWrapRef = document.createElement('div');
+            subWrapRef.setAttribute('data-sub-wrap', '');
+            subWrapRef.style.cssText = 'display:flex;flex-direction:column;gap:4px;position:relative;z-index:0;';
+            inner.appendChild(subWrapRef);
+          }
+          subWrapRef.appendChild(block);
+        }
+      });
+
+      stickyWrap.innerHTML = '';
+      stickyWrap.appendChild(inner);
+    }
+
+    // ① メイン兄弟セクションによってバー全体をナビ裏に押し上げる
+    var chainRoot = chain[0];
+    var topSiblings = chainRoot.parentElement
+      ? Array.from(chainRoot.parentElement.querySelectorAll(':scope > section[data-section-title]'))
+      : [];
+    var topSibIdx = topSiblings.indexOf(chainRoot);
+    if (topSibIdx !== -1 && topSibIdx + 1 < topSiblings.length) {
+      var nextTopBtn = topSiblings[topSibIdx + 1].querySelector(':scope > button');
+      if (nextTopBtn) {
+        var stickyH = stickyWrap.offsetHeight;
+        var topTriggerY = NAV_H + stickyH + 8;
+        var nextTopTop = nextTopBtn.getBoundingClientRect().top;
+        if (nextTopTop < topTriggerY) {
+          var topPushPx = Math.min(topTriggerY - nextTopTop, stickyH);
+          var swTopReset = stickyWrap.querySelector('[data-sub-wrap]');
+          if (swTopReset) swTopReset.style.transform = '';
+          stickyWrap.style.transition = 'none';
+          stickyWrap.style.transform = 'translateY(-' + topPushPx + 'px)';
+          stickyWrap.style.opacity = '1';
+          stickyWrap.style.pointerEvents = topPushPx > 0 ? 'none' : 'auto';
+          return;
+        }
+      }
+    }
+
+    // ② サブ兄弟セクションによってサブクローンのみをメインクローンの裏に押し上げる
+    if (chain.length >= 2) {
+      var chainLeaf = chain[chain.length - 1];
+      var leafSiblings = chainLeaf.parentElement
+        ? Array.from(chainLeaf.parentElement.querySelectorAll(':scope > section[data-section-title]'))
+        : [];
+      var leafSibIdx = leafSiblings.indexOf(chainLeaf);
+      if (leafSibIdx !== -1 && leafSibIdx + 1 < leafSiblings.length) {
+        var nextLeafBtn = leafSiblings[leafSibIdx + 1].querySelector(':scope > button');
+        var subWrapEl = stickyWrap.querySelector('[data-sub-wrap]');
+        if (nextLeafBtn && subWrapEl) {
+          var subH = subWrapEl.offsetHeight;
+          // サブラップ底辺 ≈ NAV_H + stickyH - padding(4px)、バッファ 8px
+          var leafTriggerY = NAV_H + stickyWrap.offsetHeight + 4;
+          var nextLeafTop = nextLeafBtn.getBoundingClientRect().top;
+          if (nextLeafTop < leafTriggerY) {
+            // subH + 4px 押し上げるとメインクローンの裏に完全に隠れる
+            var leafPushPx = Math.min(leafTriggerY - nextLeafTop, subH + 4);
+            subWrapEl.style.transition = 'none';
+            subWrapEl.style.transform = 'translateY(-' + leafPushPx + 'px)';
+            stickyWrap.style.transition = 'none';
+            stickyWrap.style.transform = 'translateY(0)';
+            stickyWrap.style.opacity = '1';
+            stickyWrap.style.pointerEvents = 'auto';
+            return;
+          }
+        }
+      }
+    }
+
+    // サブラップのトランスフォームをリセットしてから表示
+    var swFinalReset = stickyWrap.querySelector('[data-sub-wrap]');
+    if (swFinalReset) swFinalReset.style.transform = '';
+    show();  // sticky演出: 瞬時表示
+  }
+
+  document.addEventListener('alpine:initialized', function () {
+    createWrap();
+    window.addEventListener('scroll', updateBar, { passive: true });
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('section[data-section-title] > button');
+      if (btn) setTimeout(updateBar, 280);
+    });
+    updateBar();
+  });
+}());
+</script>
+
+<!-- アンカーリンク処理: #article-xxx クリック時にトグルを開いてスムーズスクロール -->
+<script>
+(function () {
+  function openAndScrollTo(hash) {
+    if (!hash || !hash.startsWith('#article-')) return;
+    var target = document.querySelector(hash);
+    if (!target) return;
+
+    // 祖先の Alpine x-data で open プロパティを持つ要素を収集（内→外）
+    var ancestors = [];
+    var el = target.parentElement;
+    while (el && el !== document.documentElement) {
+      if (el.hasAttribute('x-data') && window.Alpine) {
+        try {
+          var data = Alpine.$data(el);
+          if (data && typeof data.open !== 'undefined') {
+            ancestors.push(el);
+          }
+        } catch (e) {}
+      }
+      el = el.parentElement;
+    }
+
+    // 外側から内側の順で open = true（外側を先に開かないと内側が表示されない）
+    ancestors.slice().reverse().forEach(function (anc) {
+      try { Alpine.$data(anc).open = true; } catch (e) {}
+    });
+
+    // スクロールオフセット: ナビ高さ + 記事が属するセクション階層のスティッキーバー高さ
+    // （例: AI企業動向 + 自社発表 の2段が表示される場合はその合計）
+    var NAV_H_SCROLL = 52;
+    var stickyOffset = NAV_H_SCROLL;
+    var sectionStack = [];
+    var sp = target.parentElement;
+    while (sp && sp !== document.documentElement) {
+      if (sp.tagName === 'SECTION' && sp.hasAttribute('data-section-title')) {
+        sectionStack.push(sp);
+      }
+      sp = sp.parentElement;
+    }
+    // innermost-first → outermost-first に並び替えてボタン高さを合計
+    sectionStack.reverse().forEach(function (sec, idx) {
+      var btn = sec.querySelector(':scope > button');
+      if (btn) {
+        if (idx > 0) stickyOffset += 4; // クローン間の gap 4px
+        stickyOffset += btn.offsetHeight;
+      }
+    });
+    stickyOffset += sectionStack.length >= 2 ? 40 : 8; // サブあり: 大きめ余白、なし: 小さめ
+
+    var delay = ancestors.length > 0 ? 260 : 50;
+    setTimeout(function () {
+      var top = target.getBoundingClientRect().top + window.scrollY - stickyOffset;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    }, delay);
+  }
+
+  document.addEventListener('alpine:initialized', function () {
+    // ページロード時に hash があれば処理
+    if (window.location.hash.startsWith('#article-')) {
+      setTimeout(function () { openAndScrollTo(window.location.hash); }, 150);
+    }
+
+    // 同ページ内 #article- リンクのクリックを横取り
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest('a[href^="#article-"]');
+      if (!a) return;
+      e.preventDefault();
+      var hash = a.getAttribute('href');
+      history.pushState(null, '', hash);
+      openAndScrollTo(hash);
+    });
+  });
+}());
+</script>
 
 </body>
 </html>
