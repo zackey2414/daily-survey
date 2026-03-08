@@ -241,7 +241,6 @@ async def search_chats(
     q: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    sessions = []
     if q:
         stmt = (
             select(ChatSession)
@@ -255,8 +254,17 @@ async def search_chats(
             .order_by(ChatSession.updated_at.desc())
             .limit(50)
         )
-        result = await db.execute(stmt)
-        sessions = result.scalars().all()
+    else:
+        # 検索なし: 更新日時降順で最新50件を表示
+        stmt = (
+            select(ChatSession)
+            .options(selectinload(ChatSession.article))
+            .order_by(ChatSession.updated_at.desc())
+            .limit(50)
+        )
+
+    result = await db.execute(stmt)
+    sessions = result.scalars().all()
 
     return templates.TemplateResponse(
         "pages/chat_search.html",

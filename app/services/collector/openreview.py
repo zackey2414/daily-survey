@@ -1,6 +1,7 @@
 """
 OpenReview 論文収集モジュール
 主要 AI 学会の投稿論文を OpenReview API v2 (invitation ベース) で収集する
+対象トピック: CV / LLM / VLM
 """
 import logging
 from datetime import date, timedelta, datetime, timezone
@@ -13,6 +14,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 OPENREVIEW_API_URL = "https://api2.openreview.net/notes"
+JST = timezone(timedelta(hours=9))
 
 # 短縮名 → invitation テンプレート（{year} は動的置換）
 # OpenReview API v2 では `content.venue` ではなく `invitation` で学会を絞り込む
@@ -29,25 +31,47 @@ VENUE_INVITATIONS: dict[str, str] = {
     "IJCAI":   "IJCAI.org/{year}/Conference/-/Submission",
 }
 
+# CV / LLM / VLM 関連キーワード（タイトル・アブストラクト照合）
+_CV_KEYWORDS = [
+    "image", "video", "vision", "visual", "segmentation", "detection",
+    "recognition", "object", "scene", "depth", "pose", "3d", "rendering",
+    "diffusion", "generation", "synthesis", "super-resolution", "tracking",
+    "camera", "optical flow", "point cloud", "stereo",
+]
+_LLM_KEYWORDS = [
+    "language model", "llm", "large language", "gpt", "pre-train", "pretrain",
+    "instruction tun", "fine-tun", "finetuning", "rlhf", "alignment",
+    "text generation", "autoregressive", "token", "reasoning", "chain-of-thought",
+]
+_VLM_KEYWORDS = [
+    "vision-language", "vision language", "multimodal", "visual language",
+    "vlm", "clip", "image-text", "text-image", "vision encoder",
+    "visual grounding", "vqa", "visual question", "image captioning",
+]
+
+_ALL_TOPIC_KEYWORDS = _CV_KEYWORDS + _LLM_KEYWORDS + _VLM_KEYWORDS
+
+
+def _is_relevant_topic(title: str, abstract: str) -> bool:
+    """CV / LLM / VLM トピックに該当するか判定"""
+    text = (title + " " + abstract[:500]).lower()
+    return any(kw in text for kw in _ALL_TOPIC_KEYWORDS)
+
 
 async def collect_openreview(target_date: date | None = None) -> list[ArticleItem]:
     """
-    指定日付前後の論文を OpenReview から収集する。
-
-    arXiv 同様、学会の投稿締切は特定日に集中するため前後4日を許容範囲とする。
-    翌年→当年の順で各学会の invitation を試行し、結果が得られた年を採用する。
+    日本時間 target_date の 00:00〜23:59 に新規投稿された論文を収集する。
+    CV / LLM / VLM トピックのみを対象とする。
     """
     if target_date is None:
         target_date = date.today() - timedelta(days=1)
 
-    date_from = target_date - timedelta(days=4)
-    date_to   = target_date + timedelta(days=1)
-
+    # JST target_date 00:00:00 〜 23:59:59 をミリ秒に変換
     start_ms = int(datetime(
-        date_from.year, date_from.month, date_from.day, 0, 0, 0, tzinfo=timezone.utc
+        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=JST
     ).timestamp() * 1000)
     end_ms = int(datetime(
-        date_to.year, date_to.month, date_to.day, 23, 59, 59, tzinfo=timezone.utc
+        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=JST
     ).timestamp() * 1000)
 
     items: list[ArticleItem] = []
@@ -56,10 +80,7 @@ async def collect_openreview(target_date: date | None = None) -> list[ArticleIte
     # 試行する年（投稿受付は翌年の学会向けが多い: +1 → 0 → -1 の順）
     years_to_try = [target_date.year + 1, target_date.year, target_date.year - 1]
 
-    logger.info(
-        f"OpenReview 収集開始: 対象日 {target_date} "
-        f"(許容範囲: {date_from} 〜 {date_to})"
-    )
+    logger.info(f"OpenReview 収集開始: 対象日(JST) {target_date}")
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         for venue_short in settings.openreview_venues:
@@ -80,7 +101,7 @@ async def collect_openreview(target_date: date | None = None) -> list[ArticleIte
                     items.extend(venue_items)
                     break  # 結果が得られたのでこの venue の試行を終了
 
-    logger.info(f"OpenReview 収集完了: {len(items)} 件")
+    logger.info(f"OpenReview 収集完了: {len(items)} 件（トピックフィルタ後）")
     return items[:settings.openreview_max_results]
 
 
@@ -112,14 +133,13 @@ async def _fetch_by_invitation(
     if not notes:
         return []
 
-    logger.info(f"OpenReview {invitation}: {len(notes)} 件")
+    logger.info(f"OpenReview {invitation}: {len(notes)} 件（フィルタ前）")
     items: list[ArticleItem] = []
 
     for note in notes:
         note_id = note.get("id", "")
         if not note_id or note_id in seen_ids:
             continue
-        seen_ids.add(note_id)
 
         content = note.get("content", {})
         title = _extract_field(content, "title")
@@ -127,6 +147,12 @@ async def _fetch_by_invitation(
             continue
 
         abstract = _extract_field(content, "abstract")
+
+        # CV / LLM / VLM トピックフィルタ
+        if not _is_relevant_topic(title, abstract):
+            continue
+
+        seen_ids.add(note_id)
 
         authors_raw = content.get("authors", {})
         if isinstance(authors_raw, dict):

@@ -81,17 +81,45 @@
   </div>
 
   <!-- 入力フォーム -->
-  <form class="px-4 py-3 border-t bg-gray-50 flex gap-2"
+  <form class="px-4 py-3 border-t bg-gray-50 flex gap-2 items-end"
+        id="chat-form-{{ session.id }}"
         hx-post="/chat/{{ article.id }}/sessions/{{ session.id }}/messages"
         hx-target="#messages-{{ session.id }}"
         hx-swap="beforeend"
-        hx-on::after-request="this.reset(); document.getElementById('messages-{{ session.id }}').scrollTop = 9999">
-    <input type="text" name="message" required
-           placeholder="質問を入力してください..."
-           class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-           autocomplete="off">
+        hx-on::before-request="
+          var msgs = document.getElementById('messages-{{ session.id }}');
+          var t = document.createElement('div');
+          t.id = 'thinking-{{ session.id }}';
+          t.className = 'flex justify-start';
+          t.innerHTML = '<div class=\'bg-gray-100 rounded-2xl px-4 py-2.5 text-sm text-gray-500 flex items-center gap-2\'><span class=\'inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin\'></span>思考中...</div>';
+          msgs.appendChild(t);
+          msgs.scrollTop = 9999;
+          var btn = document.getElementById('chat-submit-{{ session.id }}');
+          btn.disabled = true;
+          btn.classList.add('opacity-40', 'cursor-not-allowed');
+          btn.classList.remove('hover:bg-blue-700');
+        "
+        hx-on::after-request="
+          var t = document.getElementById('thinking-{{ session.id }}');
+          if (t) t.remove();
+          this.reset();
+          var ta = this.querySelector('textarea');
+          if (ta) ta.style.height = 'auto';
+          var btn = document.getElementById('chat-submit-{{ session.id }}');
+          btn.disabled = false;
+          btn.classList.remove('opacity-40', 'cursor-not-allowed');
+          btn.classList.add('hover:bg-blue-700');
+          document.getElementById('messages-{{ session.id }}').scrollTop = 9999;
+        ">
+    <textarea name="message" required rows="1"
+              placeholder="質問を入力… (Ctrl+Enter で送信)"
+              class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-hidden"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();this.closest('form').requestSubmit();}"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
     <button type="submit"
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">
+            id="chat-submit-{{ session.id }}"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition shrink-0">
       送信
     </button>
   </form>

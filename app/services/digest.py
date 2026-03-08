@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.gemini_api_key)
 
-CITATION_RE = re.compile(r'\[ref:([a-z0-9\-]+)\]')
+CITATION_RE = re.compile(r'\[ref:([a-z0-9_\-]+)\]')
 
 
 def _get_model() -> genai.GenerativeModel:

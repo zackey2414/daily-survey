@@ -17,12 +17,14 @@
   </button>
 </form>
 
-<!-- 結果 -->
-{% if query %}
+<!-- 件数ラベル -->
 <p class="text-sm text-gray-500 mb-4">
+  {% if query %}
   「{{ query }}」の検索結果: {{ sessions|length }} 件
+  {% else %}
+  最近のチャット（最大50件）
+  {% endif %}
 </p>
-{% endif %}
 
 <div class="bg-white rounded-xl border shadow-sm divide-y">
   {% for session in sessions %}
@@ -33,9 +35,9 @@
         <p class="text-xs text-gray-500 mt-1">
           記事: {{ session.article.title_ja or session.article.title_en }}
         </p>
-        <p class="text-xs text-gray-400">{{ session.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        <p class="text-xs text-gray-400">{{ session.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
       </div>
-      <a href="/archive/{{ session.article.date }}#article-{{ session.article_id | replace(':', '-') | replace('/', '-') }}"
+      <a href="/archive/{{ session.article.date }}#article-{{ session.article_id | replace(':', '-') | replace('/', '-') | replace('.', '-') }}"
          class="text-blue-600 text-sm hover:underline shrink-0 ml-4">
         記事を開く →
       </a>
@@ -46,7 +48,8 @@
     {% if query %}
     <p>「{{ query }}」に一致するチャットはありません</p>
     {% else %}
-    <p>チャット履歴がありません</p>
+    <p>まだチャット履歴がありません</p>
+    <p class="text-xs mt-1">記事ページからチャットを開始してください</p>
     {% endif %}
   </div>
   {% endfor %}
