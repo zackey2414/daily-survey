@@ -18,11 +18,15 @@ env/
 # uv
 .uv/
 
-# 収集データ・DB・ログ・サマリー
-data/
-db/
-logs/
-summaries/
+# 収集データ・DB・ログ・サマリー（ディレクトリ構造は保持）
+data/*
+!data/.gitkeep
+db/*
+!db/.gitkeep
+logs/*
+!logs/.gitkeep
+summaries/*
+!summaries/.gitkeep
 
 # OS
 .DS_Store
