@@ -2,9 +2,11 @@
 SNS・コミュニティ収集モジュール
 Qiita API, Zenn RSS, Reddit API から前日の記事を収集する
 """
+
 import asyncio
 import logging
 from datetime import date, timedelta
+from typing import Any
 
 import feedparser
 import httpx
@@ -33,13 +35,15 @@ async def collect_community(target_date: date | None = None) -> list[ArticleItem
     zenn_task = _collect_zenn(target_date)
     reddit_task = _collect_reddit(target_date)
 
-    results = await asyncio.gather(qiita_task, zenn_task, reddit_task, return_exceptions=True)
+    results = await asyncio.gather(
+        qiita_task, zenn_task, reddit_task, return_exceptions=True
+    )
     items: list[ArticleItem] = []
     for r in results:
         if isinstance(r, list):
             items.extend(r)
     # 全ソース合計で上限に収める
-    items = items[:settings.community_max_results]
+    items = items[: settings.community_max_results]
     logger.info(f"コミュニティ収集完了: {len(items)} 件")
     return items
 
@@ -50,7 +54,7 @@ async def _collect_qiita(target_date: date) -> list[ArticleItem]:
     if settings.qiita_access_token:
         headers["Authorization"] = f"Bearer {settings.qiita_access_token}"
 
-    params = {
+    params: dict[str, Any] = {
         "page": 1,
         "per_page": 10,  # Qiita は最大 10 件（合計 20 件に収めるため）
         "query": f"tag:AI OR tag:機械学習 OR tag:LLM OR tag:生成AI created:{date_str}",
@@ -70,17 +74,19 @@ async def _collect_qiita(target_date: date) -> list[ArticleItem]:
         created_at = entry.get("created_at", "")[:10]
         if created_at != date_str:
             continue
-        items.append(ArticleItem(
-            id=f"qiita:{entry.get('id', '')}",
-            title_ja=entry.get("title", ""),
-            title_en=entry.get("title", ""),
-            abstract_en=(entry.get("body", "") or "")[:300],
-            published_date=created_at,
-            url=entry.get("url", ""),
-            source_type="qiita",
-            source_name="Qiita",
-            tags=[t.get("name", "") for t in entry.get("tags", [])],
-        ))
+        items.append(
+            ArticleItem(
+                id=f"qiita:{entry.get('id', '')}",
+                title_ja=entry.get("title", ""),
+                title_en=entry.get("title", ""),
+                abstract_en=(entry.get("body", "") or "")[:300],
+                published_date=created_at,
+                url=entry.get("url", ""),
+                source_type="qiita",
+                source_name="Qiita",
+                tags=[t.get("name", "") for t in entry.get("tags", [])],
+            )
+        )
     logger.info(f"Qiita: {len(items)} 件")
     return items
 
@@ -115,33 +121,48 @@ async def _collect_zenn(target_date: date) -> list[ArticleItem]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "") or entry.get("description", "")
 
-                items.append(ArticleItem(
-                    id=f"zenn:{_url_to_id(link)}",
-                    title_ja=title,
-                    title_en=title,
-                    abstract_en=summary[:300],
-                    published_date=target_date.isoformat(),
-                    url=link,
-                    source_type="zenn",
-                    source_name="Zenn",
-                    tags=["zenn"],
-                ))
+                items.append(
+                    ArticleItem(
+                        id=f"zenn:{_url_to_id(link)}",
+                        title_ja=title,
+                        title_en=title,
+                        abstract_en=summary[:300],
+                        published_date=target_date.isoformat(),
+                        url=link,
+                        source_type="zenn",
+                        source_name="Zenn",
+                        tags=["zenn"],
+                    )
+                )
 
     logger.info(f"Zenn: {len(items)} 件")
     return items
 
 
 async def _collect_reddit(target_date: date) -> list[ArticleItem]:
-    import time
+
     start_ts = int(
-        (date(target_date.year, target_date.month, target_date.day).__class__(
-            target_date.year, target_date.month, target_date.day
-        )).timetuple().__reduce__()[1][1]
+        (
+            date(target_date.year, target_date.month, target_date.day).__class__(
+                target_date.year, target_date.month, target_date.day
+            )
+        )
+        .timetuple()
+        .__reduce__()[1][1]
     )
     # よりシンプルな方法でタイムスタンプを計算
     from datetime import datetime
-    start_ts = int(datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0).timestamp())
-    end_ts = int(datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59).timestamp())
+
+    start_ts = int(
+        datetime(
+            target_date.year, target_date.month, target_date.day, 0, 0, 0
+        ).timestamp()
+    )
+    end_ts = int(
+        datetime(
+            target_date.year, target_date.month, target_date.day, 23, 59, 59
+        ).timestamp()
+    )
 
     items: list[ArticleItem] = []
     headers = {"User-Agent": settings.reddit_user_agent}
@@ -168,19 +189,20 @@ async def _collect_reddit(target_date: date) -> list[ArticleItem]:
                 post_id = pd.get("id", "")
                 title = pd.get("title", "")
                 selftext = (pd.get("selftext", "") or "")[:300]
-                post_url = pd.get("url", "")
                 permalink = f"https://www.reddit.com{pd.get('permalink', '')}"
 
-                items.append(ArticleItem(
-                    id=f"reddit:{subreddit}:{post_id}",
-                    title_en=title,
-                    abstract_en=selftext,
-                    published_date=target_date.isoformat(),
-                    url=permalink,
-                    source_type="reddit",
-                    source_name=f"r/{subreddit}",
-                    tags=["reddit", subreddit],
-                ))
+                items.append(
+                    ArticleItem(
+                        id=f"reddit:{subreddit}:{post_id}",
+                        title_en=title,
+                        abstract_en=selftext,
+                        published_date=target_date.isoformat(),
+                        url=permalink,
+                        source_type="reddit",
+                        source_name=f"r/{subreddit}",
+                        tags=["reddit", subreddit],
+                    )
+                )
 
     logger.info(f"Reddit: {len(items)} 件")
     return items
@@ -188,6 +210,7 @@ async def _collect_reddit(target_date: date) -> list[ArticleItem]:
 
 def _parse_date_from_str(date_str: str) -> date | None:
     from email.utils import parsedate_to_datetime
+
     try:
         dt = parsedate_to_datetime(date_str)
         return dt.date()
@@ -201,4 +224,5 @@ def _parse_date_from_str(date_str: str) -> date | None:
 
 def _url_to_id(url: str) -> str:
     import hashlib
+
     return hashlib.md5(url.encode()).hexdigest()[:12]

@@ -1,17 +1,17 @@
 """
 FastAPI アプリケーションのエントリポイント
 """
+
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.db.database import init_db
-from app.routers import archive, chat, main_page, summaries, tags
+from app.db.database import init_db, migrate_db
+from app.jinja import templates
+from app.routers import archive, chat, main_page, summaries, tags, user_tags
 from app.scheduler import start_scheduler, stop_scheduler
 
 # ログ設定
@@ -21,8 +21,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            settings.log_dir / "app.log" if settings.log_dir.exists()
-            else "app.log",
+            settings.log_dir / "app.log" if settings.log_dir.exists() else "app.log",
             encoding="utf-8",
         ),
     ],
@@ -39,6 +38,7 @@ async def lifespan(app: FastAPI):
     settings.log_dir.mkdir(parents=True, exist_ok=True)
 
     await init_db()
+    await migrate_db()
     start_scheduler()
     logger.info("AI Daily Survey 起動完了")
     yield
@@ -60,6 +60,7 @@ app.include_router(tags.router)
 app.include_router(archive.router)
 app.include_router(summaries.router)
 app.include_router(chat.router)
+app.include_router(user_tags.router)
 
 
 # 手動実行エンドポイント（デバッグ・テスト用）
@@ -91,13 +92,50 @@ async def manual_run_pipeline(date_str: str | None = None):
     }
 
 
-templates = Jinja2Templates(directory="app/templates")
+@app.post("/admin/reprocess-summaries")
+async def reprocess_summaries(date_str: str | None = None):
+    """既存 JSON の summarized=false なアイテムだけ再要約する（収集はスキップ）"""
+    import asyncio
+    from datetime import datetime
+    import pytz
+    from app.services.pipeline import load_daily_data, _save_collection
+    from app.services.summarizer import summarize_items
+
+    JST = pytz.timezone("Asia/Tokyo")
+    if not date_str:
+        date_str = datetime.now(JST).date().isoformat()
+
+    async def _run():
+        data = load_daily_data(date_str)
+        # target_date_str は JSON の date フィールドから取得
+        from app.config import settings
+        import json
+
+        first_json = settings.data_dir / date_str / "papers_cv.json"
+        target_date_str = date_str  # フォールバック
+        if first_json.exists():
+            raw = json.loads(first_json.read_text())
+            target_date_str = raw.get("date", date_str)
+
+        paper_cats = ["cv", "lg", "ai", "cl"]
+        article_cats = ["industry", "industry_news", "community", "python"]
+        tasks = [summarize_items(data[c], "paper") for c in paper_cats] + [
+            summarize_items(data[c], "article") for c in article_cats
+        ]
+        results = await asyncio.gather(*tasks)
+        all_cats = paper_cats + article_cats
+        for cat, items in zip(all_cats, results):
+            _save_collection(date_str, target_date_str, cat, items)
+        return sum(len(r) for r in results)
+
+    asyncio.create_task(_run())
+    return {"message": f"{date_str} の再要約を開始しました（バックグラウンド実行）"}
 
 
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
     return templates.TemplateResponse(
-        "error.html",
+        "pages/error.html",
         {"request": request, "status_code": 404, "message": "ページが見つかりません"},
         status_code=404,
     )
@@ -106,7 +144,11 @@ async def not_found_handler(request: Request, exc):
 @app.exception_handler(500)
 async def server_error_handler(request: Request, exc):
     return templates.TemplateResponse(
-        "error.html",
-        {"request": request, "status_code": 500, "message": "サーバーエラーが発生しました"},
+        "pages/error.html",
+        {
+            "request": request,
+            "status_code": 500,
+            "message": "サーバーエラーが発生しました",
+        },
         status_code=500,
     )

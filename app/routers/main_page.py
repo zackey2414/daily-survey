@@ -2,6 +2,7 @@
 メインページ（今日の一面）ルーター
 ホームは最新の収集日のアーカイブページへリダイレクトする
 """
+
 from datetime import datetime
 
 import pytz

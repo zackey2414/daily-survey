@@ -2,7 +2,7 @@
 APScheduler による定期実行スケジューラ
 毎日 JST 09:00 に日次パイプラインを実行する
 """
-import asyncio
+
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -18,6 +18,7 @@ scheduler = AsyncIOScheduler(timezone="Asia/Tokyo")
 async def _run_pipeline_job() -> None:
     """スケジューラから呼び出されるジョブ"""
     from app.services.pipeline import run_daily_pipeline
+
     logger.info("スケジューラ: 日次パイプライン実行開始")
     try:
         await run_daily_pipeline()

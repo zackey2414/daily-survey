@@ -3,9 +3,9 @@
 全カテゴリのデータを元に Gemini Pro で 2000文字のサマリーを生成し
 Markdown ファイルとして保存する
 """
+
 import logging
-from datetime import date
-from pathlib import Path
+import re
 
 import google.generativeai as genai
 
@@ -16,9 +16,25 @@ logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.gemini_api_key)
 
+CITATION_RE = re.compile(r"\[ref:([a-z0-9_\-]+)\]")
+
 
 def _get_model() -> genai.GenerativeModel:
     return genai.GenerativeModel(settings.gemini_summary_model)
+
+
+def inject_citations(text: str, date_str: str, is_archive: bool) -> str:
+    """[ref:safe_id] をMarkdownリンクに変換する"""
+
+    def replace(m: re.Match) -> str:
+        safe_id = m.group(1)
+        if is_archive:
+            href = f"#article-{safe_id}"
+        else:
+            href = f"/archive/{date_str}#article-{safe_id}"
+        return f"[↗]({href})"
+
+    return CITATION_RE.sub(replace, text)
 
 
 async def generate_digest(
@@ -41,8 +57,13 @@ async def generate_digest(
 
     # 要約コンテキストを構築
     context = _build_context(
-        cv_papers, lg_papers, ai_papers, cl_papers,
-        industry_news, community_items, python_items,
+        cv_papers,
+        lg_papers,
+        ai_papers,
+        cl_papers,
+        industry_news,
+        community_items,
+        python_items,
     )
 
     coverage_date = target_date_str or date_str
@@ -58,6 +79,8 @@ async def generate_digest(
 - 全体的な AI 動向の流れやトレンドも所感として加える
 - Markdown 形式で出力する（見出し・箇条書きを活用）
 - 出力の先頭に「# {coverage_date} AI 動向まとめ」という見出しを付ける
+- 記事の内容を引用する際は `[ref:safe_id]` の形式を文中に自然に埋め込んでください（例: [ref:arxiv-2603-12345]）
+- 引用は1段落につき1〜2つ程度にとどめ、不自然にならないよう注意してください
 
 ## 収集情報
 {context}
@@ -88,14 +111,17 @@ def _build_context(
 ) -> str:
     sections = []
 
-    def add_section(title: str, items: list[ArticleItem], is_paper: bool = True) -> None:
+    def add_section(
+        title: str, items: list[ArticleItem], is_paper: bool = True
+    ) -> None:
         if not items:
             return
         lines = [f"### {title} ({len(items)} 件)"]
         for item in items[:5]:  # コンテキスト長削減のため上位5件
             t = item.title_ja or item.title_en
             s = item.summary_ja or item.abstract_en[:200]
-            lines.append(f"- **{t}**: {s[:150]}")
+            safe_id = item.id.replace(":", "-").replace("/", "-").replace(".", "-")
+            lines.append(f"- [ref:{safe_id}] **{t}**: {s[:150]}")
         sections.append("\n".join(lines))
 
     add_section("CV 論文 (cs.CV)", cv_papers)

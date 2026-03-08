@@ -1,0 +1,64 @@
+<!--
+  汎用記事セクション (article_section.html)
+  必要変数:
+    section_id    : "cv", "lg", ...
+    section_icon  : 絵文字
+    section_title : セクション見出し
+    items         : ArticleItem のリスト
+    is_paper      : true=論文 / false=記事
+    subsection    : true=サブセクション / false=メインセクション（デフォルト）
+-->
+<section class="{% if subsection %}mb-2{% else %}mb-6{% endif %}" x-data="{open: false}" id="section-{{ section_id }}"
+         data-section-icon="{{ section_icon }}" data-section-title="{{ section_title }}">
+
+  {% if subsection %}
+  <!-- サブセクション見出し（小） -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between bg-white border border-indigo-100 rounded-xl px-4 sm:px-5 py-3 hover:bg-indigo-50/50 transition-colors shadow-sm">
+    <div class="flex items-center gap-2.5">
+      <span class="text-base bg-indigo-100 text-indigo-700 p-1.5 rounded-lg leading-none">{{ section_icon }}</span>
+      <h3 class="font-semibold text-sm sm:text-base text-indigo-900">{{ section_title }}</h3>
+      <span class="text-xs text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">{{ items|length }} 件</span>
+    </div>
+    <span x-text="open ? '▲' : '▼'" class="text-indigo-300 text-sm"></span>
+  </button>
+
+  {% else %}
+  <!-- メインセクション見出し（大） -->
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between relative overflow-hidden
+      {% if section_id == 'cv' %}bg-gradient-to-r from-orange-600 to-amber-500
+      {% elif section_id == 'industry' %}bg-gradient-to-r from-slate-700 to-slate-600
+      {% elif section_id == 'community' %}bg-gradient-to-r from-teal-700 to-cyan-600
+      {% elif section_id == 'python' %}bg-gradient-to-r from-emerald-700 to-green-500
+      {% else %}bg-gradient-to-r from-blue-800 to-indigo-600{% endif %}
+      text-white px-4 sm:px-6 py-4 sm:py-5">
+      <!-- 装飾 -->
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">{{ section_icon }}</span>
+        <div class="text-left">
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">{{ section_title }}</h2>
+          <p class="text-white/60 text-xs mt-0.5">{{ items|length }} 件</p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="relative text-white/50 text-base"></span>
+    </div>
+  </button>
+  {% endif %}
+
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 -translate-y-2"
+       class="mt-2 space-y-3">
+    {% for item in items %}
+    {% include "components/article/card.html" %}
+    {% endfor %}
+  </div>
+
+</section>

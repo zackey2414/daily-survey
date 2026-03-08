@@ -29,22 +29,23 @@
 <section class="mb-8" x-data="{open: true}">
   <button @click="open = !open"
           class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
-    <div class="w-full flex items-center justify-between
-      {% if cat == 'cv' %}bg-gradient-to-r from-orange-700 to-orange-500
-      {% elif cat == 'lg' or cat == 'ai' or cat == 'cl' %}bg-gradient-to-r from-indigo-800 to-indigo-600
-      {% elif cat == 'industry' %}bg-gradient-to-r from-slate-700 to-slate-500
-      {% elif cat == 'community' %}bg-gradient-to-r from-teal-700 to-teal-500
-      {% elif cat == 'python' %}bg-gradient-to-r from-emerald-700 to-emerald-500
-      {% else %}bg-gradient-to-r from-blue-800 to-blue-600{% endif %}
+    <div class="w-full flex items-center justify-between relative overflow-hidden
+      {% if cat == 'cv' %}bg-gradient-to-r from-orange-600 to-amber-500
+      {% elif cat == 'lg' or cat == 'ai' or cat == 'cl' %}bg-gradient-to-r from-indigo-700 to-indigo-500
+      {% elif cat == 'industry' %}bg-gradient-to-r from-slate-700 to-slate-600
+      {% elif cat == 'community' %}bg-gradient-to-r from-teal-700 to-cyan-600
+      {% elif cat == 'python' %}bg-gradient-to-r from-emerald-700 to-green-500
+      {% else %}bg-gradient-to-r from-blue-800 to-indigo-600{% endif %}
       text-white px-4 sm:px-6 py-4 sm:py-5">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl sm:text-3xl">{{ meta.icon }}</span>
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">{{ meta.icon }}</span>
         <div>
-          <h2 class="font-bold text-lg sm:text-xl">{{ meta.title }}</h2>
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">{{ meta.title }}</h2>
           <p class="text-white/60 text-xs mt-0.5">{{ cat_items|length }} 件</p>
         </div>
       </div>
-      <span x-text="open ? '▲' : '▼'" class="text-white/50 text-lg"></span>
+      <span x-text="open ? '▲' : '▼'" class="relative text-white/50 text-base"></span>
     </div>
   </button>
 
@@ -59,7 +60,7 @@
           {{ date_str }}
         </a>
       </div>
-      {% include "components/article_card.html" %}
+      {% include "components/article/card.html" %}
     </div>
     {% endfor %}
   </div>

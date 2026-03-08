@@ -1,6 +1,6 @@
 """
-AI 企業動向収集モジュール
-各社公式ブログの RSS フィードから前日の記事を収集する
+海外ニュースメディア RSS から AI 企業・製品関連記事を収集するモジュール
+BBC Technology / TechCrunch / The Verge / Wired などを対象とする
 """
 
 import asyncio
@@ -17,72 +17,79 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def collect_industry(target_date: date | None = None) -> list[ArticleItem]:
-    """全企業の RSS を並列収集する"""
+async def collect_industry_news(target_date: date | None = None) -> list[ArticleItem]:
+    """複数ニュースサイトから並列収集し、AI企業関連記事をフィルタリングして返す"""
     if target_date is None:
         target_date = date.today() - timedelta(days=1)
 
-    tasks = [
-        _fetch_rss(company, url, target_date)
-        for company, url in settings.industry_rss_feeds.items()
-    ]
+    tasks = [_fetch_news_rss(url, target_date) for url in settings.news_rss_feeds]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     items: list[ArticleItem] = []
-    for company, result in zip(settings.industry_rss_feeds.keys(), results):
+    for url, result in zip(settings.news_rss_feeds, results):
         if isinstance(result, list):
             items.extend(result)
         else:
-            logger.warning(f"{company} RSS 収集失敗: {result}")
+            logger.warning(f"ニュース RSS 収集失敗 ({url}): {result}")
 
-    logger.info(f"企業動向収集完了: {len(items)} 件")
-    return items
+    # キーワードフィルタリング（タイトル or 本文に企業名/製品名を含む）
+    keywords_lower = [kw.lower() for kw in settings.news_filter_keywords]
+    filtered = [
+        item
+        for item in items
+        if any(
+            kw in (item.title_en + " " + item.abstract_en).lower()
+            for kw in keywords_lower
+        )
+    ]
+
+    # 件数上限
+    filtered = filtered[: settings.news_max_results]
+    logger.info(
+        f"企業ニュース収集完了: {len(filtered)} 件 (フィルタ前: {len(items)} 件)"
+    )
+    return filtered
 
 
-async def _fetch_rss(
-    company: str,
-    url: str,
-    target_date: date,
-) -> list[ArticleItem]:
+async def _fetch_news_rss(url: str, target_date: date) -> list[ArticleItem]:
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(url, follow_redirects=True)
             resp.raise_for_status()
             feed = feedparser.parse(resp.text)
     except Exception as e:
-        logger.warning(f"{company} RSS 取得失敗: {e}")
+        logger.warning(f"ニュース RSS 取得失敗 ({url}): {e}")
         return []
 
+    source_name = feed.feed.get("title", url)
     items: list[ArticleItem] = []
+
     for entry in feed.entries:
         entry_date = _parse_entry_date(entry)
-        if entry_date != target_date:
+        # 日付が取得できない場合は含める（緩めにフィルタ）、取得できた場合は前日のみ
+        if entry_date is not None and entry_date != target_date:
             continue
 
         title = entry.get("title", "")
         link = entry.get("link", "")
         summary = entry.get("summary", "") or entry.get("description", "")
-        # HTML タグを除去
         summary = _strip_html(summary)
 
-        item_id = f"industry:{company.lower()}:{_url_to_id(link)}"
+        item_id = f"news:{_url_to_id(link)}"
         items.append(
             ArticleItem(
                 id=item_id,
                 title_en=title,
                 abstract_en=summary[:500],
-                published_date=target_date.isoformat(),
+                published_date=target_date.isoformat() if entry_date else "",
                 url=link,
                 source_type="rss",
-                source_name=company,
-                tags=["industry", company.lower()],
+                source_name=source_name,
+                tags=["industry_news"],
             )
         )
 
-        if len(items) >= settings.industry_max_per_company:
-            break
-
-    logger.info(f"{company}: {len(items)} 件")
+    logger.info(f"ニュース RSS ({source_name}): {len(items)} 件")
     return items
 
 

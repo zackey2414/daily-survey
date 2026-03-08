@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 # タイムゾーン設定
 ENV TZ=Asia/Tokyo
+ENV UV_CACHE_DIR=/app/.uv-cache
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     curl \
@@ -21,8 +22,8 @@ RUN uv sync --no-dev --no-install-project
 # アプリケーションコードのコピー
 COPY app/ ./app/
 
-# 必要なディレクトリを作成
-RUN mkdir -p data summaries db logs
+# 必要なディレクトリを作成し、実行ユーザー(1001)に権限を付与
+RUN mkdir -p data summaries db logs && chown -R 1001:1001 /app
 
 EXPOSE 8000
 
