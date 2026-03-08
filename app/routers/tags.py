@@ -2,6 +2,7 @@
 タグ検索ルーター
 /tags/{tag_name} : 指定タグを持つ記事を日付降順で表示
 """
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select, func
@@ -17,17 +18,34 @@ router = APIRouter(prefix="/tags")
 
 # カテゴリ表示名マッピング
 CATEGORY_META = {
-    "cv":             {"icon": "🖼️",  "title": "CV 論文",              "is_paper": True},
-    "lg":             {"icon": "📈",  "title": "機械学習論文 (cs.LG)",  "is_paper": True},
-    "ai":             {"icon": "🤖",  "title": "AI 論文 (cs.AI)",       "is_paper": True},
-    "cl":             {"icon": "💬",  "title": "自然言語処理 (cs.CL)",  "is_paper": True},
-    "industry":       {"icon": "🏢",  "title": "AI 企業動向（自社発表）",  "is_paper": False},
-    "industry_news":  {"icon": "📰",  "title": "AI 企業動向（その他報道）", "is_paper": False},
-    "community":      {"icon": "🗣️",  "title": "SNS・コミュニティ",     "is_paper": False},
-    "python":         {"icon": "🐍",  "title": "Python 情報（GitHub Trending）", "is_paper": False},
+    "cv": {"icon": "🖼️", "title": "CV 論文", "is_paper": True},
+    "lg": {"icon": "📈", "title": "機械学習論文 (cs.LG)", "is_paper": True},
+    "ai": {"icon": "🤖", "title": "AI 論文 (cs.AI)", "is_paper": True},
+    "cl": {"icon": "💬", "title": "自然言語処理 (cs.CL)", "is_paper": True},
+    "industry": {"icon": "🏢", "title": "AI 企業動向（自社発表）", "is_paper": False},
+    "industry_news": {
+        "icon": "📰",
+        "title": "AI 企業動向（その他報道）",
+        "is_paper": False,
+    },
+    "community": {"icon": "🗣️", "title": "SNS・コミュニティ", "is_paper": False},
+    "python": {
+        "icon": "🐍",
+        "title": "Python 情報（GitHub Trending）",
+        "is_paper": False,
+    },
 }
 
-CATEGORY_ORDER = ["cv", "lg", "ai", "cl", "industry", "industry_news", "community", "python"]
+CATEGORY_ORDER = [
+    "cv",
+    "lg",
+    "ai",
+    "cl",
+    "industry",
+    "industry_news",
+    "community",
+    "python",
+]
 
 
 @router.get("/{tag_name}", response_class=HTMLResponse)
@@ -45,7 +63,9 @@ async def tag_search(
     user_tagged_ids: set[str] = {row[0] for row in result.all()}
 
     # カテゴリ別にマッチした記事を収集（日付降順を維持）
-    results: dict[str, list[tuple[str, ArticleItem]]] = {cat: [] for cat in CATEGORY_ORDER}
+    results: dict[str, list[tuple[str, ArticleItem]]] = {
+        cat: [] for cat in CATEGORY_ORDER
+    }
     seen_ids: set[str] = set()  # 重複防止
 
     for date_str in all_dates:

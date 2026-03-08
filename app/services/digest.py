@@ -3,10 +3,9 @@
 全カテゴリのデータを元に Gemini Pro で 2000文字のサマリーを生成し
 Markdown ファイルとして保存する
 """
+
 import logging
 import re
-from datetime import date
-from pathlib import Path
 
 import google.generativeai as genai
 
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.gemini_api_key)
 
-CITATION_RE = re.compile(r'\[ref:([a-z0-9_\-]+)\]')
+CITATION_RE = re.compile(r"\[ref:([a-z0-9_\-]+)\]")
 
 
 def _get_model() -> genai.GenerativeModel:
@@ -26,6 +25,7 @@ def _get_model() -> genai.GenerativeModel:
 
 def inject_citations(text: str, date_str: str, is_archive: bool) -> str:
     """[ref:safe_id] をMarkdownリンクに変換する"""
+
     def replace(m: re.Match) -> str:
         safe_id = m.group(1)
         if is_archive:
@@ -33,6 +33,7 @@ def inject_citations(text: str, date_str: str, is_archive: bool) -> str:
         else:
             href = f"/archive/{date_str}#article-{safe_id}"
         return f"[↗]({href})"
+
     return CITATION_RE.sub(replace, text)
 
 
@@ -56,8 +57,13 @@ async def generate_digest(
 
     # 要約コンテキストを構築
     context = _build_context(
-        cv_papers, lg_papers, ai_papers, cl_papers,
-        industry_news, community_items, python_items,
+        cv_papers,
+        lg_papers,
+        ai_papers,
+        cl_papers,
+        industry_news,
+        community_items,
+        python_items,
     )
 
     coverage_date = target_date_str or date_str
@@ -105,14 +111,16 @@ def _build_context(
 ) -> str:
     sections = []
 
-    def add_section(title: str, items: list[ArticleItem], is_paper: bool = True) -> None:
+    def add_section(
+        title: str, items: list[ArticleItem], is_paper: bool = True
+    ) -> None:
         if not items:
             return
         lines = [f"### {title} ({len(items)} 件)"]
         for item in items[:5]:  # コンテキスト長削減のため上位5件
             t = item.title_ja or item.title_en
             s = item.summary_ja or item.abstract_en[:200]
-            safe_id = item.id.replace(':', '-').replace('/', '-').replace('.', '-')
+            safe_id = item.id.replace(":", "-").replace("/", "-").replace(".", "-")
             lines.append(f"- [ref:{safe_id}] **{t}**: {s[:150]}")
         sections.append("\n".join(lines))
 

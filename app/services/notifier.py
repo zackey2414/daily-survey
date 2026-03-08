@@ -2,6 +2,7 @@
 メール通知モジュール
 日次収集完了時にメールを送信する
 """
+
 import logging
 from dataclasses import dataclass, field
 
@@ -55,8 +56,7 @@ def _build_email_body(report: CollectionReport) -> str:
     elapsed_min = report.elapsed_seconds / 60
 
     count_lines = "\n".join(
-        f"  - {cat}: {cnt} 件"
-        for cat, cnt in report.counts.items()
+        f"  - {cat}: {cnt} 件" for cat, cnt in report.counts.items()
     )
     total = sum(report.counts.values())
 

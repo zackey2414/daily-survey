@@ -3,6 +3,7 @@
 - POST   /user-tags/{article_id}       : タグ追加
 - DELETE /user-tags/{article_id}/{tag} : タグ削除
 """
+
 import json
 import logging
 import re
@@ -22,7 +23,7 @@ from app.services.pipeline import list_available_dates
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/user-tags")
 
-TAG_RE = re.compile(r'^[\w\u3000-\u9FFF\-]+$')
+TAG_RE = re.compile(r"^[\w\u3000-\u9FFF\-]+$")
 
 
 async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article | None:
@@ -30,7 +31,17 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
     if article:
         return article
 
-    categories = ["cv", "openreview", "lg", "ai", "cl", "industry", "industry_news", "community", "python"]
+    categories = [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "industry_news",
+        "community",
+        "python",
+    ]
     for date_str in list_available_dates():
         for category in categories:
             file_path = settings.data_dir / date_str / f"papers_{category}.json"
@@ -39,7 +50,9 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
             try:
                 raw = json.loads(file_path.read_text(encoding="utf-8"))
                 collection = DailyCollection.model_validate(raw)
-                item = next((it for it in collection.items if it.id == article_id), None)
+                item = next(
+                    (it for it in collection.items if it.id == article_id), None
+                )
                 if item:
                     article = Article(
                         id=item.id,
@@ -61,13 +74,17 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
 
 
 async def _get_user_tags(article_id: str, db: AsyncSession) -> list[str]:
-    stmt = select(UserTag.tag).where(UserTag.article_id == article_id).order_by(UserTag.created_at)
+    stmt = (
+        select(UserTag.tag)
+        .where(UserTag.article_id == article_id)
+        .order_by(UserTag.created_at)
+    )
     result = await db.execute(stmt)
     return [row[0] for row in result.all()]
 
 
 def _safe_id(article_id: str) -> str:
-    return article_id.replace(':', '-').replace('/', '-').replace('.', '-')
+    return article_id.replace(":", "-").replace("/", "-").replace(".", "-")
 
 
 @router.post("/{article_id:path}", response_class=HTMLResponse)
@@ -79,15 +96,23 @@ async def add_tag(
 ):
     tag = tag.strip()
     if not tag:
-        return HTMLResponse('<span class="text-red-500 text-xs px-1">タグを入力してください</span>')
+        return HTMLResponse(
+            '<span class="text-red-500 text-xs px-1">タグを入力してください</span>'
+        )
     if len(tag) > 50:
-        return HTMLResponse('<span class="text-red-500 text-xs px-1">50文字以内で入力してください</span>')
+        return HTMLResponse(
+            '<span class="text-red-500 text-xs px-1">50文字以内で入力してください</span>'
+        )
     if not TAG_RE.match(tag):
-        return HTMLResponse('<span class="text-red-500 text-xs px-1">使用できない文字が含まれています</span>')
+        return HTMLResponse(
+            '<span class="text-red-500 text-xs px-1">使用できない文字が含まれています</span>'
+        )
 
     article = await _get_or_create_article(article_id, db)
     if not article:
-        return HTMLResponse('<span class="text-red-500 text-xs px-1">記事が見つかりません</span>')
+        return HTMLResponse(
+            '<span class="text-red-500 text-xs px-1">記事が見つかりません</span>'
+        )
 
     try:
         db.add(UserTag(article_id=article_id, tag=tag))

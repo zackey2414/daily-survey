@@ -2,16 +2,16 @@
 日次収集パイプライン
 収集 → 要約 → JSON 保存 → ダイジェスト生成 → メール通知 を統括する
 """
+
 import asyncio
 import json
 import logging
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 import pytz
-
-JST = pytz.timezone("Asia/Tokyo")
 
 from app.config import settings
 from app.schemas import ArticleItem, DailyCollection
@@ -26,6 +26,7 @@ from app.services.digest import generate_digest, load_digest
 from app.services.notifier import CollectionReport, send_completion_email
 
 logger = logging.getLogger(__name__)
+JST = pytz.timezone("Asia/Tokyo")
 
 
 async def run_daily_pipeline(collection_date: date | None = None) -> None:
@@ -57,8 +58,8 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         community_items,
         python_items,
     ) = await asyncio.gather(
-        collect_all_arxiv(target_date),          # cs.LG / cs.AI / cs.CL
-        collect_arxiv_cv(target_date),           # cs.CV 優先度付き最大40件
+        collect_all_arxiv(target_date),  # cs.LG / cs.AI / cs.CL
+        collect_arxiv_cv(target_date),  # cs.CV 優先度付き最大40件
         collect_openreview(target_date),
         collect_industry(target_date),
         collect_industry_news(target_date),
@@ -75,13 +76,15 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
             return default
         return result
 
-    arxiv_results        = _safe(arxiv_results,        "arXiv",             {"cs.LG": [], "cs.AI": [], "cs.CL": []})
-    cv_arxiv_papers      = _safe(cv_arxiv_papers,      "arXiv cs.CV",       [])
-    openreview_items     = _safe(openreview_items,     "OpenReview",        [])
-    industry_items       = _safe(industry_items,       "Industry",          [])
-    industry_news_items  = _safe(industry_news_items,  "Industry News",     [])
-    community_items      = _safe(community_items,      "Community",         [])
-    python_items         = _safe(python_items,         "Python",            [])
+    arxiv_results = _safe(
+        arxiv_results, "arXiv", {"cs.LG": [], "cs.AI": [], "cs.CL": []}
+    )
+    cv_arxiv_papers = _safe(cv_arxiv_papers, "arXiv cs.CV", [])
+    openreview_items = _safe(openreview_items, "OpenReview", [])
+    industry_items = _safe(industry_items, "Industry", [])
+    industry_news_items = _safe(industry_news_items, "Industry News", [])
+    community_items = _safe(community_items, "Community", [])
+    python_items = _safe(python_items, "Python", [])
 
     lg_papers = arxiv_results.get("cs.LG", [])
     ai_papers = arxiv_results.get("cs.AI", [])
@@ -102,11 +105,11 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         removed = before - len(data_for_dedup[key])
         if removed:
             logger.info(f"重複除去: {key} {removed} 件スキップ")
-    cv_arxiv_papers  = data_for_dedup["cv"]
+    cv_arxiv_papers = data_for_dedup["cv"]
     openreview_items = data_for_dedup["openreview"]
-    lg_papers        = data_for_dedup["lg"]
-    ai_papers        = data_for_dedup["ai"]
-    cl_papers        = data_for_dedup["cl"]
+    lg_papers = data_for_dedup["lg"]
+    ai_papers = data_for_dedup["ai"]
+    cl_papers = data_for_dedup["cl"]
 
     # ── 2. 並列要約 ────────────────────────────────────────────
     logger.info("要約開始...")
@@ -134,44 +137,59 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
 
     # ── 3. JSON 保存 ────────────────────────────────────────────
     logger.info("JSON 保存開始...")
-    _save_collection(collection_date_str, target_date_str, "cv",             cv_arxiv_papers)
-    _save_collection(collection_date_str, target_date_str, "openreview",     openreview_items)
-    _save_collection(collection_date_str, target_date_str, "lg",             lg_papers)
-    _save_collection(collection_date_str, target_date_str, "ai",             ai_papers)
-    _save_collection(collection_date_str, target_date_str, "cl",             cl_papers)
-    _save_collection(collection_date_str, target_date_str, "industry",       industry_items)
-    _save_collection(collection_date_str, target_date_str, "industry_news",  industry_news_items)
-    _save_collection(collection_date_str, target_date_str, "community",      community_items)
-    _save_collection(collection_date_str, target_date_str, "python",         python_items)
+    _save_collection(collection_date_str, target_date_str, "cv", cv_arxiv_papers)
+    _save_collection(
+        collection_date_str, target_date_str, "openreview", openreview_items
+    )
+    _save_collection(collection_date_str, target_date_str, "lg", lg_papers)
+    _save_collection(collection_date_str, target_date_str, "ai", ai_papers)
+    _save_collection(collection_date_str, target_date_str, "cl", cl_papers)
+    _save_collection(collection_date_str, target_date_str, "industry", industry_items)
+    _save_collection(
+        collection_date_str, target_date_str, "industry_news", industry_news_items
+    )
+    _save_collection(collection_date_str, target_date_str, "community", community_items)
+    _save_collection(collection_date_str, target_date_str, "python", python_items)
 
     # 収集件数を記録
     report.counts = {
         "CV 論文 arXiv (cs.CV)": len(cv_arxiv_papers),
-        "CV 論文 OpenReview":    len(openreview_items),
-        "機械学習 (cs.LG)":      len(lg_papers),
-        "AI (cs.AI)":            len(ai_papers),
-        "自然言語処理 (cs.CL)":   len(cl_papers),
-        "企業動向（自社発表）":    len(industry_items),
-        "企業動向（その他報道）":  len(industry_news_items),
-        "コミュニティ":            len(community_items),
-        "Python 情報":            len(python_items),
+        "CV 論文 OpenReview": len(openreview_items),
+        "機械学習 (cs.LG)": len(lg_papers),
+        "AI (cs.AI)": len(ai_papers),
+        "自然言語処理 (cs.CL)": len(cl_papers),
+        "企業動向（自社発表）": len(industry_items),
+        "企業動向（その他報道）": len(industry_news_items),
+        "コミュニティ": len(community_items),
+        "Python 情報": len(python_items),
     }
 
     # DB に記事を登録（チャット機能のため）
     await _register_articles_to_db(
         collection_date_str,
-        cv_arxiv_papers, openreview_items,
-        lg_papers, ai_papers, cl_papers,
-        industry_items, industry_news_items, community_items, python_items,
+        cv_arxiv_papers,
+        openreview_items,
+        lg_papers,
+        ai_papers,
+        cl_papers,
+        industry_items,
+        industry_news_items,
+        community_items,
+        python_items,
     )
 
     # ── 4. ダイジェスト生成 ────────────────────────────────────
     logger.info("ダイジェスト生成開始...")
     try:
-        digest_path = await generate_digest(
+        await generate_digest(
             collection_date_str,
-            cv_arxiv_papers, lg_papers, ai_papers, cl_papers,
-            industry_items, community_items, python_items,
+            cv_arxiv_papers,
+            lg_papers,
+            ai_papers,
+            cl_papers,
+            industry_items,
+            community_items,
+            python_items,
             target_date_str=target_date_str,
         )
         digest_content = load_digest(collection_date_str) or ""
@@ -195,11 +213,22 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
 def _save_collection(
     collection_date_str: str,
     target_date_str: str,
-    category: str,
+    category: Literal[
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "industry_news",
+        "community",
+        "python",
+    ],
     items: list[ArticleItem],
 ) -> None:
     """アイテムリストを JSON ファイルに保存する"""
     from datetime import datetime, timezone
+
     day_dir = settings.data_dir / collection_date_str
     day_dir.mkdir(parents=True, exist_ok=True)
 
@@ -225,9 +254,18 @@ async def _register_articles_to_db(
     """収集した記事を SQLite に登録する（チャット機能のため）"""
     from app.db.database import AsyncSessionLocal
     from app.db.models import Article
-    from sqlalchemy import select
 
-    category_names = ["cv", "openreview", "lg", "ai", "cl", "industry", "industry_news", "community", "python"]
+    category_names = [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "industry_news",
+        "community",
+        "python",
+    ]
 
     async with AsyncSessionLocal() as session:
         for category, items in zip(category_names, categories_items):
@@ -254,7 +292,17 @@ def load_daily_data(date_str: str) -> dict[str, list[ArticleItem]]:
     指定日の JSON ファイルを全カテゴリ読み込み、辞書で返す。
     キー: "cv", "lg", "ai", "cl", "industry", "community", "python"
     """
-    categories = ["cv", "openreview", "lg", "ai", "cl", "industry", "industry_news", "community", "python"]
+    categories = [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "industry_news",
+        "community",
+        "python",
+    ]
     result: dict[str, list[ArticleItem]] = {}
 
     for cat in categories:

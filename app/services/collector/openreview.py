@@ -3,8 +3,10 @@ OpenReview 論文収集モジュール
 主要 AI 学会の投稿論文を OpenReview API v2 (invitation ベース) で収集する
 対象トピック: CV / LLM / VLM
 """
+
 import logging
 from datetime import date, timedelta, datetime, timezone
+from typing import Any
 
 import httpx
 
@@ -19,34 +21,75 @@ JST = timezone(timedelta(hours=9))
 # 短縮名 → invitation テンプレート（{year} は動的置換）
 # OpenReview API v2 では `content.venue` ではなく `invitation` で学会を絞り込む
 VENUE_INVITATIONS: dict[str, str] = {
-    "ICLR":    "ICLR.cc/{year}/Conference/-/Blind_Submission",
+    "ICLR": "ICLR.cc/{year}/Conference/-/Blind_Submission",
     "NeurIPS": "NeurIPS.cc/{year}/Conference/-/Submission",
-    "ICML":    "ICML.cc/{year}/Conference/-/Submission",
-    "CVPR":    "CVPR.thecvf.com/{year}/Conference/-/Submission",
-    "ICCV":    "ICCV.thecvf.com/{year}/Conference/-/Submission",
-    "ECCV":    "ECCV/{year}/Conference/-/Submission",
-    "AAAI":    "AAAI.org/{year}/Conference/-/Submission",
-    "ACL":     "aclweb.org/ACL/{year}/Conference/-/Submission",
-    "EMNLP":   "EMNLP/{year}/Conference/-/Submission",
-    "IJCAI":   "IJCAI.org/{year}/Conference/-/Submission",
+    "ICML": "ICML.cc/{year}/Conference/-/Submission",
+    "CVPR": "CVPR.thecvf.com/{year}/Conference/-/Submission",
+    "ICCV": "ICCV.thecvf.com/{year}/Conference/-/Submission",
+    "ECCV": "ECCV/{year}/Conference/-/Submission",
+    "AAAI": "AAAI.org/{year}/Conference/-/Submission",
+    "ACL": "aclweb.org/ACL/{year}/Conference/-/Submission",
+    "EMNLP": "EMNLP/{year}/Conference/-/Submission",
+    "IJCAI": "IJCAI.org/{year}/Conference/-/Submission",
 }
 
 # CV / LLM / VLM 関連キーワード（タイトル・アブストラクト照合）
 _CV_KEYWORDS = [
-    "image", "video", "vision", "visual", "segmentation", "detection",
-    "recognition", "object", "scene", "depth", "pose", "3d", "rendering",
-    "diffusion", "generation", "synthesis", "super-resolution", "tracking",
-    "camera", "optical flow", "point cloud", "stereo",
+    "image",
+    "video",
+    "vision",
+    "visual",
+    "segmentation",
+    "detection",
+    "recognition",
+    "object",
+    "scene",
+    "depth",
+    "pose",
+    "3d",
+    "rendering",
+    "diffusion",
+    "generation",
+    "synthesis",
+    "super-resolution",
+    "tracking",
+    "camera",
+    "optical flow",
+    "point cloud",
+    "stereo",
 ]
 _LLM_KEYWORDS = [
-    "language model", "llm", "large language", "gpt", "pre-train", "pretrain",
-    "instruction tun", "fine-tun", "finetuning", "rlhf", "alignment",
-    "text generation", "autoregressive", "token", "reasoning", "chain-of-thought",
+    "language model",
+    "llm",
+    "large language",
+    "gpt",
+    "pre-train",
+    "pretrain",
+    "instruction tun",
+    "fine-tun",
+    "finetuning",
+    "rlhf",
+    "alignment",
+    "text generation",
+    "autoregressive",
+    "token",
+    "reasoning",
+    "chain-of-thought",
 ]
 _VLM_KEYWORDS = [
-    "vision-language", "vision language", "multimodal", "visual language",
-    "vlm", "clip", "image-text", "text-image", "vision encoder",
-    "visual grounding", "vqa", "visual question", "image captioning",
+    "vision-language",
+    "vision language",
+    "multimodal",
+    "visual language",
+    "vlm",
+    "clip",
+    "image-text",
+    "text-image",
+    "vision encoder",
+    "visual grounding",
+    "vqa",
+    "visual question",
+    "image captioning",
 ]
 
 _ALL_TOPIC_KEYWORDS = _CV_KEYWORDS + _LLM_KEYWORDS + _VLM_KEYWORDS
@@ -67,12 +110,18 @@ async def collect_openreview(target_date: date | None = None) -> list[ArticleIte
         target_date = date.today() - timedelta(days=1)
 
     # JST target_date 00:00:00 〜 23:59:59 をミリ秒に変換
-    start_ms = int(datetime(
-        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=JST
-    ).timestamp() * 1000)
-    end_ms = int(datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=JST
-    ).timestamp() * 1000)
+    start_ms = int(
+        datetime(
+            target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=JST
+        ).timestamp()
+        * 1000
+    )
+    end_ms = int(
+        datetime(
+            target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=JST
+        ).timestamp()
+        * 1000
+    )
 
     items: list[ArticleItem] = []
     seen_ids: set[str] = set()
@@ -89,7 +138,9 @@ async def collect_openreview(target_date: date | None = None) -> list[ArticleIte
 
             template = VENUE_INVITATIONS.get(venue_short)
             if template is None:
-                logger.debug(f"OpenReview: {venue_short} の invitation テンプレート未定義")
+                logger.debug(
+                    f"OpenReview: {venue_short} の invitation テンプレート未定義"
+                )
                 continue
 
             for year in years_to_try:
@@ -102,7 +153,7 @@ async def collect_openreview(target_date: date | None = None) -> list[ArticleIte
                     break  # 結果が得られたのでこの venue の試行を終了
 
     logger.info(f"OpenReview 収集完了: {len(items)} 件（トピックフィルタ後）")
-    return items[:settings.openreview_max_results]
+    return items[: settings.openreview_max_results]
 
 
 async def _fetch_by_invitation(
@@ -113,7 +164,7 @@ async def _fetch_by_invitation(
     end_ms: int,
     seen_ids: set[str],
 ) -> list[ArticleItem]:
-    params = {
+    params: dict[str, Any] = {
         "invitation": invitation,
         "mintcdate": start_ms,
         "maxtcdate": end_ms,
@@ -167,20 +218,24 @@ async def _fetch_by_invitation(
             pdf_url = f"https://openreview.net{pdf_url}"
 
         tcdate = note.get("tcdate", 0)
-        published_date_str = date.fromtimestamp(tcdate / 1000).isoformat() if tcdate else ""
+        published_date_str = (
+            date.fromtimestamp(tcdate / 1000).isoformat() if tcdate else ""
+        )
 
-        items.append(ArticleItem(
-            id=f"openreview:{note_id}",
-            title_en=title,
-            authors=authors,
-            abstract_en=abstract,
-            published_date=published_date_str,
-            url=f"https://openreview.net/forum?id={note_id}",
-            pdf_url=pdf_url,
-            source_type="openreview",
-            source_name=f"OpenReview ({venue_short})",
-            tags=["cv", venue_short],
-        ))
+        items.append(
+            ArticleItem(
+                id=f"openreview:{note_id}",
+                title_en=title,
+                authors=authors,
+                abstract_en=abstract,
+                published_date=published_date_str,
+                url=f"https://openreview.net/forum?id={note_id}",
+                pdf_url=pdf_url,
+                source_type="openreview",
+                source_name=f"OpenReview ({venue_short})",
+                tags=["cv", venue_short],
+            )
+        )
 
     return items
 

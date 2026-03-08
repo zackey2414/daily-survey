@@ -1,6 +1,7 @@
 """
 アーカイブページルーター（過去日付の記事表示）
 """
+
 import markdown as md
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse
@@ -17,20 +18,35 @@ router = APIRouter(prefix="/archive")
 
 
 @router.get("/{date_str}", response_class=HTMLResponse)
-async def archive_day(request: Request, date_str: str, db: AsyncSession = Depends(get_db)):
+async def archive_day(
+    request: Request, date_str: str, db: AsyncSession = Depends(get_db)
+):
     # 日付フォーマット検証
     try:
         from datetime import date, timedelta
+
         collection_date = date.fromisoformat(date_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+        )
 
     target_date_str = (collection_date - timedelta(days=1)).isoformat()
     data = load_daily_data(date_str)
 
     # 全記事 ID を収集してユーザータグを一括取得
     all_items = []
-    for key in ["cv", "openreview", "lg", "ai", "cl", "industry", "industry_news", "community", "python"]:
+    for key in [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "industry_news",
+        "community",
+        "python",
+    ]:
         all_items.extend(data.get(key, []))
 
     article_ids = [item.id for item in all_items]
@@ -49,7 +65,9 @@ async def archive_day(request: Request, date_str: str, db: AsyncSession = Depend
     digest_raw = load_digest(date_str)
     if digest_raw:
         processed = inject_citations(digest_raw, date_str, is_archive=True)
-        digest_html = md.markdown(processed, extensions=["fenced_code", "tables", "nl2br"])
+        digest_html = md.markdown(
+            processed, extensions=["fenced_code", "tables", "nl2br"]
+        )
     else:
         digest_html = None
 

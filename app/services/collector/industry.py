@@ -2,6 +2,7 @@
 AI 企業動向収集モジュール
 各社公式ブログの RSS フィードから前日の記事を収集する
 """
+
 import asyncio
 import logging
 from datetime import date, timedelta
@@ -65,16 +66,18 @@ async def _fetch_rss(
         summary = _strip_html(summary)
 
         item_id = f"industry:{company.lower()}:{_url_to_id(link)}"
-        items.append(ArticleItem(
-            id=item_id,
-            title_en=title,
-            abstract_en=summary[:500],
-            published_date=target_date.isoformat(),
-            url=link,
-            source_type="rss",
-            source_name=company,
-            tags=["industry", company.lower()],
-        ))
+        items.append(
+            ArticleItem(
+                id=item_id,
+                title_en=title,
+                abstract_en=summary[:500],
+                published_date=target_date.isoformat(),
+                url=link,
+                source_type="rss",
+                source_name=company,
+                tags=["industry", company.lower()],
+            )
+        )
 
         if len(items) >= settings.industry_max_per_company:
             break
@@ -91,6 +94,7 @@ def _parse_entry_date(entry) -> date | None:
         try:
             if hasattr(raw, "tm_year"):
                 import time
+
                 return date(*time.gmtime(time.mktime(raw))[:3])
             dt = parsedate_to_datetime(str(raw))
             return dt.date()
@@ -120,4 +124,5 @@ def _strip_html(text: str) -> str:
 
 def _url_to_id(url: str) -> str:
     import hashlib
+
     return hashlib.md5(url.encode()).hexdigest()[:12]

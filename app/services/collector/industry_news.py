@@ -2,6 +2,7 @@
 海外ニュースメディア RSS から AI 企業・製品関連記事を収集するモジュール
 BBC Technology / TechCrunch / The Verge / Wired などを対象とする
 """
+
 import asyncio
 import logging
 from datetime import date, timedelta
@@ -34,7 +35,8 @@ async def collect_industry_news(target_date: date | None = None) -> list[Article
     # キーワードフィルタリング（タイトル or 本文に企業名/製品名を含む）
     keywords_lower = [kw.lower() for kw in settings.news_filter_keywords]
     filtered = [
-        item for item in items
+        item
+        for item in items
         if any(
             kw in (item.title_en + " " + item.abstract_en).lower()
             for kw in keywords_lower
@@ -42,8 +44,10 @@ async def collect_industry_news(target_date: date | None = None) -> list[Article
     ]
 
     # 件数上限
-    filtered = filtered[:settings.news_max_results]
-    logger.info(f"企業ニュース収集完了: {len(filtered)} 件 (フィルタ前: {len(items)} 件)")
+    filtered = filtered[: settings.news_max_results]
+    logger.info(
+        f"企業ニュース収集完了: {len(filtered)} 件 (フィルタ前: {len(items)} 件)"
+    )
     return filtered
 
 
@@ -72,16 +76,18 @@ async def _fetch_news_rss(url: str, target_date: date) -> list[ArticleItem]:
         summary = _strip_html(summary)
 
         item_id = f"news:{_url_to_id(link)}"
-        items.append(ArticleItem(
-            id=item_id,
-            title_en=title,
-            abstract_en=summary[:500],
-            published_date=target_date.isoformat() if entry_date else "",
-            url=link,
-            source_type="rss",
-            source_name=source_name,
-            tags=["industry_news"],
-        ))
+        items.append(
+            ArticleItem(
+                id=item_id,
+                title_en=title,
+                abstract_en=summary[:500],
+                published_date=target_date.isoformat() if entry_date else "",
+                url=link,
+                source_type="rss",
+                source_name=source_name,
+                tags=["industry_news"],
+            )
+        )
 
     logger.info(f"ニュース RSS ({source_name}): {len(items)} 件")
     return items
@@ -95,6 +101,7 @@ def _parse_entry_date(entry) -> date | None:
         try:
             if hasattr(raw, "tm_year"):
                 import time
+
                 return date(*time.gmtime(time.mktime(raw))[:3])
             dt = parsedate_to_datetime(str(raw))
             return dt.date()
@@ -124,4 +131,5 @@ def _strip_html(text: str) -> str:
 
 def _url_to_id(url: str) -> str:
     import hashlib
+
     return hashlib.md5(url.encode()).hexdigest()[:12]

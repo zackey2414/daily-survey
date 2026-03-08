@@ -2,6 +2,7 @@
 Gemini API を使った要約処理モジュール
 個別記事・論文の要約には gemini-2.5-flash を使用する（一面まとめは digest.py で gemini-2.5-pro を使用）
 """
+
 import asyncio
 import logging
 import re
@@ -56,7 +57,9 @@ def _call_gemini(prompt: str) -> str:
     return response.text
 
 
-def _build_prompt(item: ArticleItem, category: Literal["paper", "article", "industry"]) -> str:
+def _build_prompt(
+    item: ArticleItem, category: Literal["paper", "article", "industry"]
+) -> str:
     if category == "paper":
         return f"""以下の論文を日本語で詳しく要約してください。
 必ず以下のフォーマットで出力してください（Markdown 形式）。
@@ -92,7 +95,7 @@ def _build_prompt(item: ArticleItem, category: Literal["paper", "article", "indu
 
 ---
 タイトル: {item.title_en}
-著者: {', '.join(item.authors[:5])}
+著者: {", ".join(item.authors[:5])}
 アブストラクト:
 {item.abstract_en}
 """
@@ -163,7 +166,9 @@ def _build_prompt(item: ArticleItem, category: Literal["paper", "article", "indu
 """
 
 
-def _parse_result(item: ArticleItem, text: str, category: Literal["paper", "article", "industry"]) -> None:
+def _parse_result(
+    item: ArticleItem, text: str, category: Literal["paper", "article", "industry"]
+) -> None:
     """LLM の出力テキストを ArticleItem の各フィールドに格納する。
 
     Gemini は 【見出し】 を ### 【見出し】 / **【見出し】** など
@@ -171,8 +176,8 @@ def _parse_result(item: ArticleItem, text: str, category: Literal["paper", "arti
     """
     # セクション境界: 行頭の任意の Markdown 装飾 + 【見出し】 を検出
     _SECTION_RE = re.compile(
-        r'(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,2})?【([^】]+)】(?:\*{1,2})?[ \t]*\n'
-        r'(.*?)(?=\n[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,2})?【|^---$|\Z)',
+        r"(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,2})?【([^】]+)】(?:\*{1,2})?[ \t]*\n"
+        r"(.*?)(?=\n[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,2})?【|^---$|\Z)",
         re.DOTALL | re.MULTILINE,
     )
 
@@ -213,11 +218,9 @@ def _parse_result(item: ArticleItem, text: str, category: Literal["paper", "arti
 
     tags_text = sections.get("タグ", "")
     if tags_text:
-        item.hashtags = [
-            t.strip().lstrip("#")
-            for t in tags_text.split()
-            if t.strip()
-        ][:8]
+        item.hashtags = [t.strip().lstrip("#") for t in tags_text.split() if t.strip()][
+            :8
+        ]
 
     if not item.title_ja and item.title_en:
         item.title_ja = item.title_en

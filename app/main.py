@@ -1,15 +1,16 @@
 """
 FastAPI アプリケーションのエントリポイント
 """
+
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.db.database import init_db, migrate_db
+from app.jinja import templates
 from app.routers import archive, chat, main_page, summaries, tags, user_tags
 from app.scheduler import start_scheduler, stop_scheduler
 
@@ -20,8 +21,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            settings.log_dir / "app.log" if settings.log_dir.exists()
-            else "app.log",
+            settings.log_dir / "app.log" if settings.log_dir.exists() else "app.log",
             encoding="utf-8",
         ),
     ],
@@ -92,9 +92,6 @@ async def manual_run_pipeline(date_str: str | None = None):
     }
 
 
-from app.jinja import templates
-
-
 @app.post("/admin/reprocess-summaries")
 async def reprocess_summaries(date_str: str | None = None):
     """既存 JSON の summarized=false なアイテムだけ再要約する（収集はスキップ）"""
@@ -113,6 +110,7 @@ async def reprocess_summaries(date_str: str | None = None):
         # target_date_str は JSON の date フィールドから取得
         from app.config import settings
         import json
+
         first_json = settings.data_dir / date_str / "papers_cv.json"
         target_date_str = date_str  # フォールバック
         if first_json.exists():
@@ -121,10 +119,9 @@ async def reprocess_summaries(date_str: str | None = None):
 
         paper_cats = ["cv", "lg", "ai", "cl"]
         article_cats = ["industry", "industry_news", "community", "python"]
-        tasks = (
-            [summarize_items(data[c], "paper") for c in paper_cats] +
-            [summarize_items(data[c], "article") for c in article_cats]
-        )
+        tasks = [summarize_items(data[c], "paper") for c in paper_cats] + [
+            summarize_items(data[c], "article") for c in article_cats
+        ]
         results = await asyncio.gather(*tasks)
         all_cats = paper_cats + article_cats
         for cat, items in zip(all_cats, results):
@@ -148,6 +145,10 @@ async def not_found_handler(request: Request, exc):
 async def server_error_handler(request: Request, exc):
     return templates.TemplateResponse(
         "pages/error.html",
-        {"request": request, "status_code": 500, "message": "サーバーエラーが発生しました"},
+        {
+            "request": request,
+            "status_code": 500,
+            "message": "サーバーエラーが発生しました",
+        },
         status_code=500,
     )

@@ -5,6 +5,7 @@
 - POST /chat/{article_id}/sessions/{sid}/messages : メッセージ送信
 - GET  /chat/search                         : チャット検索
 """
+
 import asyncio
 import json
 import logging
@@ -128,11 +129,15 @@ async def get_session(
     if not chat_session:
         raise HTTPException(status_code=404, detail="セッションが見つかりません")
 
-    return await _render_chat_panel(request, article, chat_session, chat_session.messages, db)
+    return await _render_chat_panel(
+        request, article, chat_session, chat_session.messages, db
+    )
 
 
 # ── メッセージ送信 ──────────────────────────────────────────────────
-@router.post("/{article_id:path}/sessions/{session_id}/messages", response_class=HTMLResponse)
+@router.post(
+    "/{article_id:path}/sessions/{session_id}/messages", response_class=HTMLResponse
+)
 async def send_message(
     request: Request,
     article_id: str,
@@ -225,7 +230,9 @@ async def delete_session(
     remaining = result.scalar_one_or_none()
 
     if remaining:
-        return await _render_chat_panel(request, article, remaining, remaining.messages, db)
+        return await _render_chat_panel(
+            request, article, remaining, remaining.messages, db
+        )
 
     new_session = ChatSession(article_id=article_id, title="新しいチャット")
     db.add(new_session)
@@ -246,8 +253,7 @@ async def search_chats(
             select(ChatSession)
             .join(ChatMessage, ChatSession.id == ChatMessage.session_id)
             .where(
-                ChatSession.title.ilike(f"%{q}%")
-                | ChatMessage.content.ilike(f"%{q}%")
+                ChatSession.title.ilike(f"%{q}%") | ChatMessage.content.ilike(f"%{q}%")
             )
             .options(selectinload(ChatSession.article))
             .distinct()
@@ -274,6 +280,7 @@ async def search_chats(
 
 # ── 内部ヘルパー ────────────────────────────────────────────────────
 
+
 async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article | None:
     """DB から Article を取得し、なければ JSON ファイルから作成する"""
     article = await db.get(Article, article_id)
@@ -281,7 +288,16 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
         return article
 
     # JSON ファイルから検索（最新日付順）
-    categories = ["cv", "openreview", "lg", "ai", "cl", "industry", "community", "python"]
+    categories = [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "community",
+        "python",
+    ]
     for date_str in list_available_dates():
         for category in categories:
             file_path = settings.data_dir / date_str / f"papers_{category}.json"
@@ -290,7 +306,9 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
             try:
                 raw = json.loads(file_path.read_text(encoding="utf-8"))
                 collection = DailyCollection.model_validate(raw)
-                item = next((it for it in collection.items if it.id == article_id), None)
+                item = next(
+                    (it for it in collection.items if it.id == article_id), None
+                )
                 if item:
                     article = Article(
                         id=item.id,
@@ -381,7 +399,7 @@ URL: {article.url}
             settings.gemini_chat_model,
             system_instruction=system_instruction,
         )
-        chat = model.start_chat(history=history)
+        chat = model.start_chat(history=history)  # type: ignore[arg-type]
         response = await asyncio.get_event_loop().run_in_executor(
             None, lambda: chat.send_message(user_message)
         )

@@ -5,6 +5,7 @@ RAG (Retrieval-Augmented Generation) サービス
 - 論文 (arXiv / OpenReview): JSON に保存済みの abstract_en + 要約フィールドを使用
 - 記事 (RSS / Qiita / Zenn 等): URL から本文を取得し、ユーザー質問に関連するチャンクを抽出
 """
+
 import json
 import logging
 import re
@@ -19,11 +20,11 @@ from app.schemas import ArticleItem, DailyCollection
 logger = logging.getLogger(__name__)
 
 # RAG チューニングパラメータ
-_MAX_CHUNK_CHARS = 800      # チャンク最大文字数
-_TOP_K_CHUNKS    = 8        # 返す関連チャンク数
-_MIN_SCORE       = 0.0      # スコア閾値（0.0 = 常にトップK を返す）
-_MAX_FETCH_CHARS = 40_000   # URL フェッチ後のテキスト上限
-_INTRO_CHUNKS    = 2        # スコアに関わらず先頭から必ず含めるチャンク数
+_MAX_CHUNK_CHARS = 800  # チャンク最大文字数
+_TOP_K_CHUNKS = 8  # 返す関連チャンク数
+_MIN_SCORE = 0.0  # スコア閾値（0.0 = 常にトップK を返す）
+_MAX_FETCH_CHARS = 40_000  # URL フェッチ後のテキスト上限
+_INTRO_CHUNKS = 2  # スコアに関わらず先頭から必ず含めるチャンク数
 
 # 論文ソースタイプ（URL フェッチ不要）
 _PAPER_SOURCES = {"arxiv", "openreview"}
@@ -36,14 +37,15 @@ _page_text_cache: dict[str, str] = {}
 # 内部ユーティリティ
 # ──────────────────────────────────────────────
 
+
 def _tokenize(text: str) -> set[str]:
     """英語単語（3文字以上）と日本語トークンを抽出"""
-    en = re.findall(r'[a-zA-Z]{3,}', text.lower())
-    ja = re.findall(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]+', text)
+    en = re.findall(r"[a-zA-Z]{3,}", text.lower())
+    ja = re.findall(r"[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]+", text)
     # 日本語は bi-gram で近似
     ja_bigrams: list[str] = []
     for w in ja:
-        ja_bigrams += [w[i:i+2] for i in range(len(w) - 1)]
+        ja_bigrams += [w[i : i + 2] for i in range(len(w) - 1)]
     return set(en) | set(ja_bigrams)
 
 
@@ -56,7 +58,7 @@ def _score(chunk: str, query_tokens: set[str]) -> float:
 
 def _split_paragraphs(text: str) -> list[str]:
     """段落単位でテキストを分割し、長すぎる段落は文で再分割"""
-    raw_paras = [p.strip() for p in re.split(r'\n{2,}', text) if p.strip()]
+    raw_paras = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
     chunks: list[str] = []
     buf = ""
     for para in raw_paras:
@@ -67,7 +69,7 @@ def _split_paragraphs(text: str) -> list[str]:
                 chunks.append(buf)
             # 段落が単体で長すぎる場合、文区切り
             if len(para) > _MAX_CHUNK_CHARS:
-                sentences = re.split(r'(?<=[。．！？.!?])\s*', para)
+                sentences = re.split(r"(?<=[。．！？.!?])\s*", para)
                 buf = ""
                 for s in sentences:
                     if len(buf) + len(s) <= _MAX_CHUNK_CHARS:
@@ -99,7 +101,7 @@ async def _fetch_page_text(url: str) -> str:
             tag.decompose()
 
         text = soup.get_text(separator="\n")
-        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
         return text[:_MAX_FETCH_CHARS]
     except Exception as e:
         logger.warning(f"URL フェッチ失敗 ({url}): {e}")
@@ -109,6 +111,7 @@ async def _fetch_page_text(url: str) -> str:
 # ──────────────────────────────────────────────
 # 公開 API
 # ──────────────────────────────────────────────
+
 
 def load_article_item(article: Article) -> ArticleItem | None:
     """
@@ -130,7 +133,16 @@ def load_article_item(article: Article) -> ArticleItem | None:
     # フォールバック: 全日付ディレクトリを検索
     if not settings.data_dir.exists():
         return None
-    categories = ["cv", "openreview", "lg", "ai", "cl", "industry", "community", "python"]
+    categories = [
+        "cv",
+        "openreview",
+        "lg",
+        "ai",
+        "cl",
+        "industry",
+        "community",
+        "python",
+    ]
     date_dirs = sorted(
         [d for d in settings.data_dir.iterdir() if d.is_dir()],
         key=lambda d: d.name,
@@ -146,7 +158,9 @@ def load_article_item(article: Article) -> ArticleItem | None:
             try:
                 raw = json.loads(fp.read_text(encoding="utf-8"))
                 collection = DailyCollection.model_validate(raw)
-                item = next((it for it in collection.items if it.id == article.id), None)
+                item = next(
+                    (it for it in collection.items if it.id == article.id), None
+                )
                 if item:
                     return item
             except Exception:
@@ -182,7 +196,10 @@ async def build_rag_context(
             if full_item.novelty_ja:
                 parts.append(f"## 新規性・貢献\n{full_item.novelty_ja}")
             if full_item.key_points_ja:
-                parts.append("## ポイント\n" + "\n".join(f"- {p}" for p in full_item.key_points_ja))
+                parts.append(
+                    "## ポイント\n"
+                    + "\n".join(f"- {p}" for p in full_item.key_points_ja)
+                )
         elif article.summary_ja:
             parts.append(f"## 要約\n{article.summary_ja}")
         return "\n\n".join(parts)
@@ -195,7 +212,9 @@ async def build_rag_context(
         if full_item.summary_ja:
             parts.append(f"## 要約（日本語）\n{full_item.summary_ja}")
         if full_item.key_points_ja:
-            parts.append("## ポイント\n" + "\n".join(f"- {p}" for p in full_item.key_points_ja))
+            parts.append(
+                "## ポイント\n" + "\n".join(f"- {p}" for p in full_item.key_points_ja)
+            )
     elif article.summary_ja:
         parts.append(f"## 要約\n{article.summary_ja}")
 
@@ -213,7 +232,7 @@ async def build_rag_context(
             [(c, _score(c, query_tokens)) for c in chunks[_INTRO_CHUNKS:]],
             key=lambda x: -x[1],
         )
-        extra = [c for c, _ in scored[:max(0, _TOP_K_CHUNKS - len(intro))]]
+        extra = [c for c, _ in scored[: max(0, _TOP_K_CHUNKS - len(intro))]]
         top = intro + extra
         if top:
             parts.append("## 本文（関連箇所）\n" + "\n\n---\n\n".join(top))

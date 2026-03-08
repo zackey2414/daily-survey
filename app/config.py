@@ -41,7 +41,7 @@ class Settings:
     arxiv_max_results: int = 20
     industry_max_per_company: int = 5
     community_max_results: int = 20  # SNS 全ソース合計上限
-    python_max_results: int = 10     # Python 情報合計上限
+    python_max_results: int = 10  # Python 情報合計上限
     openreview_max_results: int = 20
 
     # 企業ブログ RSS
@@ -64,16 +64,39 @@ class Settings:
     news_max_results: int = 15
     # フィルタリングキーワード（AI企業・製品名）
     news_filter_keywords: list[str] = [
-        "OpenAI", "Google", "Anthropic", "Meta", "Amazon",
-        "Microsoft", "Alibaba", "xAI", "Grok", "ChatGPT",
-        "Gemini", "Claude", "Copilot", "GPT", "DeepMind",
-        "Llama", "Mistral", "Cohere", "Perplexity",
+        "OpenAI",
+        "Google",
+        "Anthropic",
+        "Meta",
+        "Amazon",
+        "Microsoft",
+        "Alibaba",
+        "xAI",
+        "Grok",
+        "ChatGPT",
+        "Gemini",
+        "Claude",
+        "Copilot",
+        "GPT",
+        "DeepMind",
+        "Llama",
+        "Mistral",
+        "Cohere",
+        "Perplexity",
     ]
 
     # OpenReview 対象学会
     openreview_venues: list[str] = [
-        "CVPR", "NeurIPS", "ICLR", "ICCV", "ICML",
-        "AAAI", "ACL", "ECCV", "EMNLP", "IJCAI",
+        "CVPR",
+        "NeurIPS",
+        "ICLR",
+        "ICCV",
+        "ICML",
+        "AAAI",
+        "ACL",
+        "ECCV",
+        "EMNLP",
+        "IJCAI",
     ]
 
     # Reddit 対象サブレディット

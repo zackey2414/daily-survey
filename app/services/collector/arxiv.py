@@ -2,10 +2,11 @@
 arXiv 論文収集モジュール
 対象カテゴリ: cs.CV, cs.LG, cs.AI, cs.CL
 """
+
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Literal
+from typing import Any, Literal
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -43,9 +44,9 @@ async def collect_arxiv(
 
     # JST 前日 00:00〜23:59 = UTC (target_date-1) 15:00 〜 target_date 14:59
     from_str = (target_date - timedelta(days=1)).strftime("%Y%m%d") + "150000"
-    to_str   = target_date.strftime("%Y%m%d") + "145959"
+    to_str = target_date.strftime("%Y%m%d") + "145959"
 
-    params = {
+    params: dict[str, Any] = {
         "search_query": f"cat:{category} AND submittedDate:[{from_str} TO {to_str}]",
         "sortBy": "submittedDate",
         "sortOrder": "descending",
@@ -87,7 +88,7 @@ def _parse_arxiv_xml(
 
         # JST で公開日を判定
         try:
-            pub_dt = datetime.fromisoformat(published_raw.replace('Z', '+00:00'))
+            pub_dt = datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
             pub_jst_date = pub_dt.astimezone(JST).date()
         except ValueError:
             continue
@@ -98,12 +99,13 @@ def _parse_arxiv_xml(
         arxiv_id_raw = entry.findtext("atom:id", "", NS)
         arxiv_id = arxiv_id_raw.split("/abs/")[-1].strip()
 
-        title    = (entry.findtext("atom:title",   "", NS) or "").replace("\n", " ").strip()
-        abstract = (entry.findtext("atom:summary", "", NS) or "").replace("\n", " ").strip()
+        title = (entry.findtext("atom:title", "", NS) or "").replace("\n", " ").strip()
+        abstract = (
+            (entry.findtext("atom:summary", "", NS) or "").replace("\n", " ").strip()
+        )
 
         authors = [
-            a.findtext("atom:name", "", NS)
-            for a in entry.findall("atom:author", NS)
+            a.findtext("atom:name", "", NS) for a in entry.findall("atom:author", NS)
         ]
 
         pdf_url = ""
@@ -112,18 +114,20 @@ def _parse_arxiv_xml(
                 pdf_url = link.get("href", "")
                 break
 
-        items.append(ArticleItem(
-            id=f"arxiv:{arxiv_id}",
-            title_en=title,
-            authors=authors,
-            abstract_en=abstract,
-            published_date=pub_jst_date.isoformat(),
-            url=f"https://arxiv.org/abs/{arxiv_id}",
-            pdf_url=pdf_url or f"https://arxiv.org/pdf/{arxiv_id}",
-            source_type="arxiv",
-            source_name="arXiv",
-            tags=[category],
-        ))
+        items.append(
+            ArticleItem(
+                id=f"arxiv:{arxiv_id}",
+                title_en=title,
+                authors=authors,
+                abstract_en=abstract,
+                published_date=pub_jst_date.isoformat(),
+                url=f"https://arxiv.org/abs/{arxiv_id}",
+                pdf_url=pdf_url or f"https://arxiv.org/pdf/{arxiv_id}",
+                source_type="arxiv",
+                source_name="arXiv",
+                tags=[category],
+            )
+        )
 
     return items
 
@@ -132,18 +136,35 @@ def _cv_priority_score(item: ArticleItem) -> int:
     """CS.CV 論文のトピック優先度スコア（小さいほど優先表示）"""
     text = (item.title_en + " " + item.abstract_en[:300]).lower()
     # 優先度 1: 画像検索・物体中心画像検索・動画サンプリング
-    if any(kw in text for kw in [
-        "image retrieval", "image search", "object-centric",
-        "video sampling", "temporal sampling", "frame sampling",
-        "video retrieval", "content-based retrieval",
-    ]):
+    if any(
+        kw in text
+        for kw in [
+            "image retrieval",
+            "image search",
+            "object-centric",
+            "video sampling",
+            "temporal sampling",
+            "frame sampling",
+            "video retrieval",
+            "content-based retrieval",
+        ]
+    ):
         return 0
     # 優先度 2: 動画像分類・物体検知・セグメンテーション・認識
-    if any(kw in text for kw in [
-        "classification", "object detection", "instance segmentation",
-        "semantic segmentation", "panoptic", "action recognition",
-        "video understanding", "video classification", "pose estimation",
-    ]):
+    if any(
+        kw in text
+        for kw in [
+            "classification",
+            "object detection",
+            "instance segmentation",
+            "semantic segmentation",
+            "panoptic",
+            "action recognition",
+            "video understanding",
+            "video classification",
+            "pose estimation",
+        ]
+    ):
         return 1
     # 優先度 3: その他 cs.CV
     return 2
@@ -164,7 +185,9 @@ async def collect_arxiv_cv(
     return sorted_items[:max_results]
 
 
-async def collect_all_arxiv(target_date: date | None = None) -> dict[str, list[ArticleItem]]:
+async def collect_all_arxiv(
+    target_date: date | None = None,
+) -> dict[str, list[ArticleItem]]:
     """LG / AI / CL カテゴリを並列収集する（CV は collect_arxiv_cv を使うこと）"""
     categories: list[ArxivCategory] = ["cs.LG", "cs.AI", "cs.CL"]
     results = await asyncio.gather(
@@ -172,6 +195,5 @@ async def collect_all_arxiv(target_date: date | None = None) -> dict[str, list[A
         return_exceptions=True,
     )
     return {
-        cat: (r if isinstance(r, list) else [])
-        for cat, r in zip(categories, results)
+        cat: (r if isinstance(r, list) else []) for cat, r in zip(categories, results)
     }
