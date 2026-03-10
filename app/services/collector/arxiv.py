@@ -43,7 +43,14 @@ async def collect_arxiv(
         max_results = settings.arxiv_max_results
 
     # JST 前日 00:00〜23:59 = UTC (target_date-1) 15:00 〜 target_date 14:59
-    from_str = (target_date - timedelta(days=1)).strftime("%Y%m%d") + "150000"
+    # 月曜日の場合、金曜〜月曜の投稿を含むため submittedDate を金曜まで遡る
+    if target_date.weekday() == 0:  # Monday
+        lookback_days = 3  # 金曜まで遡る
+    else:
+        lookback_days = 1
+    from_str = (target_date - timedelta(days=lookback_days)).strftime(
+        "%Y%m%d"
+    ) + "150000"
     to_str = target_date.strftime("%Y%m%d") + "145959"
 
     params: dict[str, Any] = {

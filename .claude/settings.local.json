@@ -11,7 +11,8 @@
       "Bash(python:*)",
       "Bash(uv run:*)",
       "Bash(cat:*)",
-      "Bash(uv add:*)"
+      "Bash(uv add:*)",
+      "Bash(for d)"
     ]
   }
 }
