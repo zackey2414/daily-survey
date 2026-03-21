@@ -16,14 +16,95 @@
 
 ### 収集カテゴリ
 
-| カテゴリ | 内容 |
+| カテゴリ | 内容 | 収集方法 |
+|----------|------|----------|
+| CV 論文 | arXiv `cs.CV` + OpenReview（CVPR / NeurIPS / ICLR 等10学会） | arXiv API + OpenReview API |
+| AI 全般論文 | arXiv `cs.LG` / `cs.AI` / `cs.CL` | arXiv API |
+| AI 企業動向（自社発表） | OpenAI / Google / Anthropic / Meta / Amazon / Alibaba 公式ブログ | RSS フィード |
+| AI 企業動向（その他報道） | BBC / TechCrunch / The Verge / Wired | RSS フィード + キーワードフィルタ |
+| Qiita | AI・機械学習・LLM 関連記事 | REST API |
+| Zenn | AI・機械学習・LLM 関連記事 | RSS フィード |
+| Reddit | r/MachineLearning / r/artificial / r/LocalLLaMA | JSON API |
+| Python 情報 | GitHub Trending (Python) | Web スクレイピング |
+
+> GitHub Trending は `github.com/trending/python?since=daily` を BeautifulSoup でパースし、リポジトリ名・説明・スター数を抽出しています。
+
+---
+
+## 技術スタック
+
+| レイヤー | 技術 |
 |----------|------|
-| CV 論文 | arXiv `cs.CV` + OpenReview（CVPR / NeurIPS / ICLR 等10学会） |
-| AI 全般論文 | arXiv `cs.LG` / `cs.AI` / `cs.CL` |
-| AI 企業動向（自社発表） | OpenAI / Google / Anthropic / Meta / Amazon / Alibaba 公式ブログ RSS |
-| AI 企業動向（その他報道） | BBC / TechCrunch / The Verge / Wired 等の海外ニュース RSS |
-| SNS・コミュニティ | Qiita / Zenn / Reddit |
-| Python 情報 | PyPI RSS / GitHub Trending |
+| Backend | Python 3.12 + FastAPI |
+| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS (CDN) |
+| DB | SQLite (aiosqlite + SQLAlchemy async) |
+| LLM | Google Gemini API |
+| スケジューラ | APScheduler (AsyncIOScheduler, Asia/Tokyo) |
+| コンテナ | Docker + uv |
+| 通知 | SMTP メール |
+
+### LLM 利用詳細
+
+| 用途 | モデル | 説明 |
+|------|--------|------|
+| 個別記事の要約 | gemini-2.5-flash | 各記事の要約・タグ生成・メタ的な学びの抽出 |
+| 一面まとめ（ダイジェスト） | gemini-2.5-pro | 全カテゴリの記事を俯瞰した日次サマリーを生成 |
+| チャット | gemini-2.5-flash + RAG | 記事本文を取得してコンテキストに含め、質問に回答 |
+
+### データ保存
+
+| データ | 形式 | 保存先 |
+|--------|------|--------|
+| 日次収集データ | JSON | `data/YYYY-MM-DD/` |
+| 日次サマリー | Markdown | `summaries/YYYY-MM-DD.md` |
+| チャット履歴・ユーザータグ | SQLite | `db/survey.db` |
+
+JSON ファイルが正のデータソースであり、DB はチャット履歴とユーザータグの永続化にのみ使用しています。
+
+---
+
+## セットアップ
+
+### 共通手順
+
+```bash
+# 1. リポジトリをクローン
+git clone <repo-url> everyday-survey
+cd everyday-survey
+
+# 2. 環境変数を設定
+cp .env.example .env
+# .env を編集して GEMINI_API_KEY 等を入力
+```
+
+### Docker で起動（推奨）
+
+```bash
+# ビルド＆起動
+docker compose up --build -d
+
+# ログ確認
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+
+### ローカルで直接起動
+
+前提: Python 3.12+ と [uv](https://docs.astral.sh/uv/) がインストール済みであること。
+
+```bash
+# 依存パッケージをインストール
+uv sync
+
+# 起動
+TZ=Asia/Tokyo uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+http://localhost:8000 でアクセスできます。`data/` や `db/` などのディレクトリは初回起動時に自動作成されます。
+
+> **注意**: `TZ=Asia/Tokyo` を設定しないと、スケジューラの実行時刻（JST 09:00）がずれます。Docker の場合は Dockerfile 内で設定済みです。
 
 ---
 
@@ -79,36 +160,6 @@ Host survey
 
 ```bash
 ssh survey
-```
-
----
-
-## セットアップ（初回・サーバ側）
-
-```bash
-# 1. リポジトリをクローン
-git clone <repo-url> everyday-survey
-cd everyday-survey
-
-# 2. 環境変数を設定
-cp .env.example .env
-# .env を編集して GEMINI_API_KEY 等を入力
-
-# 3. Docker で起動
-docker compose up --build -d
-```
-
-## 起動・停止（サーバ側）
-
-```bash
-# 起動
-docker compose up -d
-
-# 停止
-docker compose down
-
-# ログ確認
-docker compose logs -f
 ```
 
 ---
