@@ -41,6 +41,24 @@ async def migrate_db() -> None:
 
         try:
             await conn.execute(
+                text(
+                    "ALTER TABLE chat_messages ADD COLUMN used_search BOOLEAN DEFAULT 0"
+                )
+            )
+            logger.info("chat_messages.used_search カラムを追加しました")
+        except Exception:
+            pass
+
+        try:
+            await conn.execute(
+                text("ALTER TABLE chat_messages ADD COLUMN search_sources TEXT")
+            )
+            logger.info("chat_messages.search_sources カラムを追加しました")
+        except Exception:
+            pass
+
+        try:
+            await conn.execute(
                 text("""
                 CREATE TABLE IF NOT EXISTS user_tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

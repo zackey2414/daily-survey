@@ -1,5 +1,8 @@
 from datetime import datetime
+import json as _json
+
 from sqlalchemy import (
+    Boolean,
     String,
     Text,
     Integer,
@@ -74,11 +77,25 @@ class ChatMessage(Base):
         String(10), nullable=False
     )  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    used_search: Mapped[bool] = mapped_column(Boolean, default=False)
+    search_sources: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped["ChatSession"] = relationship(
         "ChatSession", back_populates="messages"
     )
+
+    @property
+    def search_sources_parsed(self) -> list[dict]:
+        """JSON 文字列をパースしてソース一覧を返す"""
+        if not self.search_sources:
+            return []
+        try:
+            return _json.loads(self.search_sources)
+        except (_json.JSONDecodeError, TypeError):
+            return []
 
 
 class UserTag(Base):
