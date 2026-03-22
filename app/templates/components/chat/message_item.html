@@ -3,12 +3,51 @@
   必要変数: msg (ChatMessage)
 -->
 <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-  <div class="max-w-[85%] rounded-xl px-4 py-2 text-sm leading-relaxed
-    {% if msg.role == 'user' %}
-      bg-blue-600 text-white
-    {% else %}
-      bg-gray-100 text-gray-800
-    {% endif %}">
-    {{ msg.content | replace('\n', '<br>') | safe }}
+  <div class="max-w-[85%]">
+    <div class="rounded-xl px-4 py-2 text-sm leading-relaxed
+      {% if msg.role == 'user' %}
+        bg-blue-600 text-white
+      {% else %}
+        bg-gray-100 text-gray-800
+      {% endif %}">
+      {% if msg.role == 'assistant' and msg.used_search %}
+        {% set sources = msg.search_sources_parsed %}
+        {% set ns = namespace(content=msg.content | replace('\n', '<br>')) %}
+        {% for src in sources %}
+          {% set idx = loop.index %}
+          {% set badge = '[' ~ idx ~ ']' %}
+          {% set link = '<a href="' ~ src.uri ~ '" target="_blank" rel="noopener" class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-blue-600 bg-blue-100 rounded hover:bg-blue-200 no-underline align-super leading-none" title="' ~ (src.title or src.uri) ~ '">' ~ idx ~ '</a>' %}
+          {% set ns.content = ns.content | replace(badge, link) %}
+        {% endfor %}
+        {{ ns.content | safe }}
+      {% else %}
+        {{ msg.content | replace('\n', '<br>') | safe }}
+      {% endif %}
+    </div>
+    {% if msg.role == 'assistant' and msg.used_search %}
+    <div class="mt-1 ml-1">
+      <details class="text-xs text-gray-500">
+        <summary class="cursor-pointer hover:text-gray-700 inline-flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          Web検索を使用
+        </summary>
+        {% set sources = msg.search_sources_parsed %}
+        {% if sources %}
+        <ul class="mt-1 space-y-0.5 pl-4 list-none">
+          {% for src in sources %}
+          <li class="flex items-start gap-1.5">
+            <span class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-blue-600 bg-blue-100 rounded shrink-0 mt-0.5">{{ loop.index }}</span>
+            <a href="{{ src.uri }}" target="_blank" rel="noopener"
+               class="text-blue-500 hover:underline break-all">{{ src.title or src.uri }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </details>
+    </div>
+    {% endif %}
   </div>
 </div>

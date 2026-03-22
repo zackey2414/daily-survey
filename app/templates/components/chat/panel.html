@@ -91,15 +91,37 @@
           var t = document.createElement('div');
           t.id = 'thinking-{{ session.id }}';
           t.className = 'flex justify-start';
-          t.innerHTML = '<div class=\'bg-gray-100 rounded-2xl px-4 py-2.5 text-sm text-gray-500 flex items-center gap-2\'><span class=\'inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin\'></span>思考中...</div>';
+          t.innerHTML = `<div class='bg-gray-100 rounded-2xl px-4 py-2.5 text-sm text-gray-500'>
+            <div class='flex items-center gap-2'>
+              <span class='inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin'></span>
+              <span id='thinking-label-{{ session.id }}'>思考中...</span>
+            </div>
+          </div>`;
           msgs.appendChild(t);
           msgs.scrollTop = 9999;
+          this._searchTimer = setTimeout(function(){
+            var label = document.getElementById('thinking-label-{{ session.id }}');
+            if (!label) return;
+            label.closest('.bg-gray-100').innerHTML = `
+              <div class='flex items-center gap-2'>
+                <svg class='w-3.5 h-3.5 animate-spin text-blue-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/>
+                </svg>
+                <span class='text-blue-600'>Web検索中...</span>
+              </div>
+              <div class='mt-1 flex gap-1'>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:0ms'></span>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:150ms'></span>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:300ms'></span>
+              </div>`;
+          }, 3000);
           var btn = document.getElementById('chat-submit-{{ session.id }}');
           btn.disabled = true;
           btn.classList.add('opacity-40', 'cursor-not-allowed');
           btn.classList.remove('hover:bg-blue-700');
         "
         hx-on::after-request="
+          if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
           var t = document.getElementById('thinking-{{ session.id }}');
           if (t) t.remove();
           this.reset();

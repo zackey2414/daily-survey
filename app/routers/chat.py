@@ -9,7 +9,14 @@
 import asyncio
 import json
 import logging
-
+from google import genai as genai_new
+from google.genai.types import (
+    Content,
+    GenerateContentConfig,
+    GoogleSearch,
+    Part,
+    Tool,
+)
 import google.generativeai as genai
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -29,6 +36,10 @@ from app.jinja import templates
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat")
 
+# 新 SDK クライアント（チャット用）
+_genai_client = genai_new.Client(api_key=settings.gemini_api_key)
+
+# 旧 SDK（タイトル生成用に維持）
 genai.configure(api_key=settings.gemini_api_key)
 
 
@@ -175,12 +186,22 @@ async def send_message(
         rag_context = chat_session.rag_context
 
     # AI 応答を生成
-    ai_response = await _generate_response(
+    gen_result = await _generate_response(
         article, chat_session.messages + [user_msg], message, rag_context
     )
 
     # AI メッセージを保存
-    ai_msg = ChatMessage(session_id=session_id, role="assistant", content=ai_response)
+    ai_msg = ChatMessage(
+        session_id=session_id,
+        role="assistant",
+        content=gen_result["text"],
+        used_search=gen_result["used_search"],
+        search_sources=(
+            json.dumps(gen_result["sources"], ensure_ascii=False)
+            if gen_result["sources"]
+            else None
+        ),
+    )
     db.add(ai_msg)
 
     # 初回メッセージのときセッションタイトルを自動生成
@@ -365,21 +386,83 @@ async def _render_chat_panel(
     )
 
 
+def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
+    """レスポンスからグラウンディング情報を抽出する。
+
+    Returns:
+        (used_search, sources, cited_text)
+        - sources: [{"title": str, "uri": str}, ...]
+        - cited_text: インライン引用 [1][2] を埋め込んだテキスト
+    """
+    try:
+        meta = response.candidates[0].grounding_metadata
+        if not meta or not meta.grounding_chunks:
+            return False, [], response.text
+    except (AttributeError, IndexError):
+        return False, [], response.text
+
+    # ソース一覧を構築
+    sources: list[dict] = []
+    for chunk in meta.grounding_chunks:
+        web = getattr(chunk, "web", None)
+        if web:
+            sources.append({"title": web.title or "", "uri": web.uri or ""})
+
+    if not sources:
+        return False, [], response.text
+
+    # grounding_supports からインライン引用を挿入
+    text = response.text
+    supports = meta.grounding_supports or []
+    if supports:
+        # end_index 降順でソート（後ろから挿入して位置ズレを防ぐ）
+        indexed = []
+        for s in supports:
+            seg = s.segment
+            if not seg or not seg.text:
+                continue
+            indices = (
+                list(s.grounding_chunk_indices) if s.grounding_chunk_indices else []
+            )
+            if not indices:
+                continue
+            # テキスト中の該当箇所を特定
+            seg_text = seg.text.strip()
+            pos = text.find(seg_text)
+            if pos == -1:
+                continue
+            end_pos = pos + len(seg_text)
+            citation_marks = "".join(f"[{i + 1}]" for i in indices if i < len(sources))
+            indexed.append((end_pos, citation_marks))
+
+        # 重複除去・降順ソートして後ろから挿入
+        seen_positions: set[int] = set()
+        for end_pos, marks in sorted(indexed, key=lambda x: x[0], reverse=True):
+            if end_pos in seen_positions:
+                continue
+            seen_positions.add(end_pos)
+            text = text[:end_pos] + marks + text[end_pos:]
+
+    return True, sources, text
+
+
 async def _generate_response(
     article: Article,
     messages: list[ChatMessage],
     user_message: str,
     rag_context: str,
-) -> str:
+) -> dict:
     """
     Gemini Flash を使ってチャット応答を生成する。
+    Google Search グラウンディング付き (google-genai SDK)。
 
-    rag_context はセッション初回メッセージ時に構築済みのものを受け取る。
-    （JSON 読み込み・URL フェッチ・チャンク選択はここでは行わない）
+    Returns:
+        {"text": str, "used_search": bool, "sources": list[dict]}
     """
     system_instruction = f"""あなたは以下の論文・記事についての質問に答える専門AIアシスタントです。
 ユーザーの質問には、以下に示すコンテキストを根拠にして日本語で回答してください。
-コンテキストに記載のない情報を求められた場合は、その旨を明示してから一般知識で補足してください。
+コンテキストに記載のない概念・背景知識・最新情報について質問された場合は、Google検索ツールを使って正確な情報を取得してから回答してください。
+コンテキスト内の情報だけで回答できる場合は検索を使わないでください。
 
 # 対象記事
 タイトル: {article.title_ja or article.title_en}
@@ -388,25 +471,38 @@ URL: {article.url}
 # コンテキスト
 {rag_context}"""
 
-    # 会話履歴（最後のユーザーメッセージを除く）
-    history = []
+    # 会話履歴を新 SDK 形式に変換
+    contents: list[Content] = []
     for msg in messages[:-1]:
         role = "user" if msg.role == "user" else "model"
-        history.append({"role": role, "parts": [msg.content]})
+        contents.append(Content(role=role, parts=[Part(text=msg.content)]))
+    contents.append(Content(role="user", parts=[Part(text=user_message)]))
 
     try:
-        model = genai.GenerativeModel(
-            settings.gemini_chat_model,
-            system_instruction=system_instruction,
-        )
-        chat = model.start_chat(history=history)  # type: ignore[arg-type]
         response = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: chat.send_message(user_message)
+            None,
+            lambda: _genai_client.models.generate_content(
+                model=settings.gemini_chat_model,
+                contents=contents,
+                config=GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=[Tool(google_search=GoogleSearch())],
+                ),
+            ),
         )
-        return response.text
+        used_search, sources, cited_text = _extract_grounding_info(response)
+        return {
+            "text": cited_text,
+            "used_search": used_search,
+            "sources": sources,
+        }
     except Exception as e:
         logger.error(f"チャット応答生成失敗: {e}")
-        return f"申し訳ありません、応答の生成に失敗しました。エラー: {e}"
+        return {
+            "text": f"申し訳ありません、応答の生成に失敗しました。エラー: {e}",
+            "used_search": False,
+            "sources": [],
+        }
 
 
 async def _generate_title(first_message: str) -> str:

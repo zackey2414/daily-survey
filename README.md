@@ -49,7 +49,15 @@
 |------|--------|------|
 | 個別記事の要約 | gemini-2.5-flash | 各記事の要約・タグ生成・メタ的な学びの抽出 |
 | 一面まとめ（ダイジェスト） | gemini-2.5-pro | 全カテゴリの記事を俯瞰した日次サマリーを生成 |
-| チャット | gemini-2.5-flash + RAG | 記事本文を取得してコンテキストに含め、質問に回答 |
+| チャット | gemini-2.5-flash + RAG + Google Search | 記事本文を RAG コンテキストとし、必要に応じて Google 検索で補完して回答 |
+
+#### チャット Web 検索グラウンディング
+
+チャット機能は Gemini の **Google Search グラウンディング**を統合しています。RAG コンテキスト（記事本文）だけでは回答できない基礎概念・背景知識・最新動向の質問に対して、Gemini が自動的に Google 検索を実行し、検索結果を根拠にした回答を生成します。
+
+- 検索の実行判断は Gemini 自身が行う（`dynamic_threshold` で頻度を調整可能）
+- 検索が使われた場合、回答の下にソースリンクが折りたたみ表示される
+- `GEMINI_SEARCH_THRESHOLD` 環境変数で閾値を制御（0.0=常に検索, 1.0=検索しない, デフォルト 0.3）
 
 ### データ保存
 
@@ -89,6 +97,23 @@ docker compose logs -f
 # 停止
 docker compose down
 ```
+
+#### コンテナ構成
+
+| サービス名 | イメージ | 説明 |
+|-----------|---------|------|
+| `app` | `python:3.12-slim` ベース | FastAPI + APScheduler を単一コンテナで実行。ポート 8000 を公開 |
+
+単一コンテナ構成です。SQLite をファイルベースで使用するため DB コンテナは不要です。
+データは以下のボリュームマウントでホスト側に永続化されます:
+
+| マウント | 用途 |
+|---------|------|
+| `./data:/app/data` | 日次収集 JSON |
+| `./summaries:/app/summaries` | 日次サマリー Markdown |
+| `./db:/app/db` | SQLite DB (チャット履歴・ユーザータグ) |
+| `./logs:/app/logs` | アプリログ |
+| `./app:/app/app` | 開発時ホットリロード用 |
 
 ### ローカルで直接起動
 
@@ -176,6 +201,7 @@ curl -X POST http://localhost:8000/admin/run-pipeline
 
 ## 詳細ドキュメント
 
+- `app/README.md` — アプリケーション構造・モジュール解説
 - `docs/implementation.md` — 実装詳細・システムワークフロー
 - `docs/article_format.md` — 記事フォーマット定義
 - `docs/requirements.md` — 要件定義書

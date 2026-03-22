@@ -10,6 +10,7 @@ class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_summary_model: str = os.getenv("GEMINI_SUMMARY_MODEL", "gemini-2.5-pro")
     gemini_chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    gemini_search_threshold: float = float(os.getenv("GEMINI_SEARCH_THRESHOLD", "0.3"))
 
     # Reddit API
     reddit_client_id: str = os.getenv("REDDIT_CLIENT_ID", "")
