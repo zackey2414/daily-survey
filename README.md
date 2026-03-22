@@ -82,7 +82,7 @@ cd everyday-survey
 
 # 2. 環境変数を設定
 cp .env.example .env
-# .env を編集して GEMINI_API_KEY 等を入力
+# .env を編集して必要な値を入力（詳細は docs/env.md を参照）
 ```
 
 ### Docker で起動（推奨）
@@ -202,6 +202,7 @@ curl -X POST http://localhost:8000/admin/run-pipeline
 ## 詳細ドキュメント
 
 - `app/README.md` — アプリケーション構造・モジュール解説
+- `docs/env.md` — 環境変数の設定ガイド（`.env` の全項目解説）
 - `docs/implementation.md` — 実装詳細・システムワークフロー
 - `docs/article_format.md` — 記事フォーマット定義
 - `docs/requirements.md` — 要件定義書
