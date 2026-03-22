@@ -1,8 +1,9 @@
 # 要件定義書: AI Daily Survey Web Application
 
-**バージョン**: 1.0
+**バージョン**: 1.1
 **作成日**: 2026-03-03
-**ステータス**: ドラフト
+**最終更新**: 2026-03-22
+**ステータス**: 実装反映済み
 
 ---
 
@@ -37,8 +38,9 @@
 | 1 | **CV論文** | arXiv `cs.CV` + OpenReview 対象学会 |
 | 2 | **AI全般論文** | arXiv `cs.LG` / `cs.AI` / `cs.CL` |
 | 3 | **AI企業動向** | OpenAI, Google, Anthropic, Meta, Amazon, Alibaba |
-| 4 | **SNS・コミュニティ** | Qiita, Zenn, Reddit |
-| 5 | **Python情報** | PyPI, GitHub Trending, ライブラリ更新情報 |
+| 4 | **AI企業動向（その他報道）** | BBC, TechCrunch, The Verge, Wired 等の海外ニュース |
+| 5 | **SNS・コミュニティ** | Qiita, Zenn, Reddit |
+| 6 | **Python情報** | PyPI, GitHub Trending, ライブラリ更新情報 |
 
 ---
 
@@ -84,12 +86,12 @@
 | コンテナ | Docker / Docker Compose | 必須 |
 | Python 環境管理 | **uv** | pip の代替 |
 | バックエンド | **Python 3.12+ / FastAPI** | |
-| フロントエンド | **Jinja2 + HTMX** | Python ベースのテンプレート + 軽量インタラクション |
-| CSS フレームワーク | **Tailwind CSS** | CDN 経由 or PostCSS |
+| フロントエンド | **Jinja2 + HTMX + Alpine.js** | Python ベースのテンプレート + 軽量インタラクション |
+| CSS フレームワーク | **Tailwind CSS** | CDN 経由（Play CDN） |
 | データベース | **SQLite** | チャット履歴のみ |
 | データ保存 | **JSON ファイル** | 日次収集データ（再利用性重視） |
 | サマリー保存 | **Markdown ファイル** | 日次一面まとめ |
-| LLM API | **Google Gemini API** | 個別記事要約・チャット: `gemini-2.5-flash`、一面まとめ生成: `gemini-2.5-pro` |
+| LLM API | **Google Gemini API** | 個別記事要約・チャット: `gemini-2.5-flash`、一面まとめ生成: `gemini-2.5-pro`。チャットは Google Search グラウンディング付き |
 | スケジューラ | **APScheduler**（FastAPI 組み込み）または **cron**（Docker 内） | JST 09:00 実行 |
 | 通知 | SMTP（メール） | 収集完了時 |
 
@@ -99,9 +101,10 @@
 |------|--------|----------|------|
 | 個別記事・論文の要約 | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` | 件数が多く高速処理を優先 |
 | 一面まとめ生成（日次ダイジェスト） | `gemini-2.5-pro` | `GEMINI_SUMMARY_MODEL` | 全体を見渡す高品質な要約が必要 |
-| チャット応答 | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` | 対話的応答はコスト・速度を優先 |
+| チャット応答 | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` | 対話的応答はコスト・速度を優先。Google Search グラウンディング付き |
 
 - モデル名は設定ファイル（`.env`）で個別に切り替え可能
+- チャット応答は `google-genai` SDK を使用し、RAG コンテキストで不足する場合に Gemini が自動で Google 検索を実行する
 
 ---
 
@@ -160,7 +163,23 @@
 - 取得フィールド: タイトル, 公開日, 概要, URL
 - 上限: 各社 5件/日（合計最大 30件）
 
-#### 3.1.5 SNS・コミュニティ収集
+#### 3.1.5 AI 企業動向収集（その他報道）
+
+- ソース: 海外大手ニュースサイトの RSS フィード
+- 対象メディア:
+
+| メディア | ソース |
+|---------|--------|
+| BBC | BBC Technology RSS |
+| TechCrunch | TechCrunch AI RSS |
+| The Verge | The Verge RSS |
+| Wired | Wired RSS |
+
+- AI 関連キーワードでフィルタリング
+- 取得フィールド: タイトル, 公開日, 概要, URL
+- 上限: 合計最大 15件/日
+
+#### 3.1.6 SNS・コミュニティ収集
 
 **Qiita**
 - API: Qiita API v2 (`https://qiita.com/api/v2/items`)
@@ -177,7 +196,7 @@
 - 対象サブレディット: `r/MachineLearning`, `r/artificial`, `r/LocalLLaMA`
 - 上限: 各 10件/日（合計 30件）
 
-#### 3.1.6 Python 情報収集
+#### 3.1.7 Python 情報収集
 
 - ソース（複数組み合わせ）:
   - PyPI RSS: `https://pypi.org/rss/updates.xml`
@@ -250,7 +269,10 @@
 - **1記事に対して複数チャット**を作成可能
   - チャット間の切り替え: 記事カード下部の `<` `>` ボタン（ページネーション形式）
   - 新規チャット作成ボタン（`+` アイコン等）
-- チャット応答の参照範囲: 対象記事の全文・要約データ（RAG 的に Gemini API に渡す）
+- チャット応答の参照範囲: 対象記事の全文・要約データ（RAG コンテキストとして Gemini API に渡す）
+- **Google Search グラウンディング**: RAG コンテキストだけでは回答できない質問に対して、Gemini が自動で Google 検索を実行し、検索結果を根拠に回答を生成する
+  - 検索が使われた場合、回答にインライン引用 `[1][2]` が付与され、ソースリンクが折りたたみ表示される
+  - `GEMINI_SEARCH_THRESHOLD` 環境変数で検索頻度を制御可能
 - チャットタイトル: 初回メッセージをもとに **LLM が自動生成**（最大 30文字程度）
 - チャット履歴の保存: **SQLite**（後述のデータモデル参照）
 - セッションをまたいでも続きから回答可能
@@ -261,7 +283,18 @@
 - キーワード検索（タイトル・本文対象）
 - 記事タイトルでフィルタリング
 
-#### 3.3.3 日次サマリーフィードページ
+#### 3.3.3 タグ機能
+
+- **AI 生成タグ**: LLM が要約時に生成する `hashtags` フィールドのタグ
+- **ユーザータグ**: ユーザーが手動で記事に付与するタグ（追加・削除可能）
+- タグ一覧ページ（`/tags/`）:
+  - AI 生成タグとユーザータグを別セクションで表示
+  - タグクラウド形式（出現回数に応じてサイズ・色の濃さが変化）
+- タグ別記事ページ（`/tags/{tag_name}`）:
+  - 指定タグを持つ記事を全期間・全カテゴリから横断検索
+- ユーザータグの保存: **SQLite**（`user_tags` テーブル）
+
+#### 3.3.4 日次サマリーフィードページ
 
 - URL: `/summaries?page=N`
 - 全一面まとめを**日付降順**で表示（最新が先頭）
@@ -270,7 +303,7 @@
 - 各日付のカードをクリックすると、その日のまとめページに遷移（`/summaries/YYYY-MM-DD`）
 - サマリーは Markdown ファイルをレンダリングして表示
 
-#### 3.3.4 過去日付の記事ページ
+#### 3.3.5 過去日付の記事ページ
 
 - URL: `/archive/YYYY-MM-DD`
 - 特定日の全収集データを表示（JSON から読み込み）
@@ -414,13 +447,15 @@
 **ファイル一覧（1日分）**:
 ```
 data/YYYY-MM-DD/
-├── papers_cv.json           # cs.CV（arXiv + OpenReview 統合）
-├── papers_lg.json           # cs.LG
-├── papers_ai.json           # cs.AI
-├── papers_cl.json           # cs.CL
-├── industry_news.json       # 企業動向
-├── community.json           # SNS・コミュニティ
-└── python_news.json         # Python 情報
+├── papers_cv.json              # cs.CV（arXiv）
+├── papers_openreview.json      # OpenReview（10学会）
+├── papers_lg.json              # cs.LG
+├── papers_ai.json              # cs.AI
+├── papers_cl.json              # cs.CL
+├── papers_industry.json        # 企業動向（自社発表）
+├── papers_industry_news.json   # 企業動向（その他報道）
+├── papers_community.json       # SNS・コミュニティ
+└── papers_python.json          # Python 情報
 ```
 
 **サマリーファイル**:
@@ -446,18 +481,30 @@ CREATE TABLE articles (
 CREATE TABLE chat_sessions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id  TEXT NOT NULL REFERENCES articles(id),
-    title       TEXT,               -- LLM が自動生成（最大30文字）
+    title       TEXT NOT NULL DEFAULT '新しいチャット',  -- LLM が自動生成
+    rag_context TEXT,               -- キャッシュされた RAG コンテキスト
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- チャットメッセージテーブル
 CREATE TABLE chat_messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL REFERENCES chat_sessions(id),
+    role            TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+    content         TEXT NOT NULL,
+    used_search     BOOLEAN DEFAULT 0,   -- Google Search グラウンディング使用フラグ
+    search_sources  TEXT,                 -- 検索ソース JSON ([{"title": "...", "uri": "..."}])
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ユーザータグテーブル（手動付与）
+CREATE TABLE user_tags (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  INTEGER NOT NULL REFERENCES chat_sessions(id),
-    role        TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-    content     TEXT NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    article_id  TEXT NOT NULL REFERENCES articles(id),
+    tag         TEXT NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(article_id, tag)
 );
 
 CREATE INDEX idx_chat_sessions_article ON chat_sessions(article_id);
@@ -478,45 +525,59 @@ everyday-survey/
 ├── uv.lock
 │
 ├── app/                          # FastAPI アプリケーション
-│   ├── main.py                   # FastAPI エントリポイント
-│   ├── scheduler.py              # APScheduler 設定
+│   ├── main.py                   # FastAPI エントリポイント・lifespan・管理エンドポイント
+│   ├── config.py                 # 全設定（Settings クラス、.env 読み込み）
+│   ├── schemas.py                # Pydantic モデル（ArticleItem, DailyCollection）
+│   ├── jinja.py                  # Jinja2 テンプレートエンジン設定（カスタムフィルタ含む）
+│   ├── scheduler.py              # APScheduler（JST 09:00 自動実行）
 │   ├── routers/
-│   │   ├── main_page.py          # メインページ（今日の一面）
-│   │   ├── archive.py            # 過去日付アーカイブ
-│   │   ├── summaries.py          # サマリー履歴フィード
-│   │   └── chat.py               # チャット API
+│   │   ├── main_page.py          # GET /
+│   │   ├── archive.py            # GET /archive/{date_str}
+│   │   ├── summaries.py          # GET /summaries, /summaries/{date_str}
+│   │   ├── chat.py               # チャット API（RAG + Google Search グラウンディング）
+│   │   ├── tags.py               # GET /tags/, /tags/{tag_name}
+│   │   └── user_tags.py          # POST/DELETE /user-tags/{article_id}
 │   ├── services/
 │   │   ├── collector/
-│   │   │   ├── arxiv.py          # arXiv 収集
-│   │   │   ├── openreview.py     # OpenReview 収集
-│   │   │   ├── industry.py       # 企業 RSS 収集
-│   │   │   ├── community.py      # Qiita / Zenn / Reddit 収集
-│   │   │   └── python_news.py    # Python 情報収集
+│   │   │   ├── arxiv.py          # arXiv API（cs.CV / cs.LG / cs.AI / cs.CL）
+│   │   │   ├── openreview.py     # OpenReview API v2（10学会）
+│   │   │   ├── industry.py       # 企業公式ブログ RSS（自社発表）
+│   │   │   ├── industry_news.py  # 海外ニュースメディア RSS（その他報道）
+│   │   │   ├── community.py      # Qiita API / Zenn RSS / Reddit JSON API
+│   │   │   └── python_news.py    # PyPI RSS / GitHub Trending スクレイピング
 │   │   ├── summarizer.py         # Gemini API 要約処理
-│   │   ├── digest.py             # 一面まとめ生成
-│   │   └── notifier.py           # メール通知
+│   │   ├── digest.py             # 一面まとめ生成・Markdown 保存
+│   │   ├── rag.py                # チャット用 URL フェッチ・RAG コンテキスト構築
+│   │   └── notifier.py           # SMTP メール通知
 │   ├── db/
-│   │   ├── database.py           # SQLite 接続管理
-│   │   └── models.py             # SQLAlchemy モデル（または生 SQL）
+│   │   ├── database.py           # SQLAlchemy async セッション・init_db・migrate_db
+│   │   └── models.py             # ORM モデル（Article, ChatSession, ChatMessage, UserTag）
 │   └── templates/                # Jinja2 テンプレート
-│       ├── base.html
-│       ├── index.html
-│       ├── archive.html
-│       ├── summaries.html
-│       ├── summary_detail.html
+│       ├── base.html             # 共通レイアウト（ナビ・スティッキーバー JS）
+│       ├── pages/
+│       │   ├── index.html
+│       │   ├── summaries.html
+│       │   ├── summary_detail.html
+│       │   ├── tags_list.html
+│       │   ├── tags.html
+│       │   ├── chat_search.html
+│       │   └── error.html
 │       └── components/
-│           ├── article_card.html
-│           └── chat_panel.html
+│           ├── article/          # 記事カード・要約表示
+│           ├── chat/             # チャットパネル・メッセージ
+│           └── tags/             # タグ管理 UI
 │
-├── data/                         # 日次収集 JSON データ
+├── data/                         # 日次収集 JSON データ（永続化）
 │   └── YYYY-MM-DD/
 │       ├── papers_cv.json
+│       ├── papers_openreview.json
 │       ├── papers_lg.json
 │       ├── papers_ai.json
 │       ├── papers_cl.json
-│       ├── industry_news.json
-│       ├── community.json
-│       └── python_news.json
+│       ├── papers_industry.json
+│       ├── papers_industry_news.json
+│       ├── papers_community.json
+│       └── papers_python.json
 │
 ├── summaries/                    # 日次一面まとめ（Markdown）
 │   └── YYYY-MM-DD.md
@@ -524,8 +585,14 @@ everyday-survey/
 ├── db/
 │   └── survey.db                 # SQLite データベース
 │
-└── logs/
-    └── collector.log             # 収集ログ
+├── logs/
+│   └── app.log                   # アプリログ
+│
+└── docs/
+    ├── requirements.md           # 要件定義書（本ドキュメント）
+    ├── implementation.md         # 実装詳細
+    ├── article_format.md         # 記事フォーマット定義
+    └── env.md                    # 環境変数の設定ガイド
 ```
 
 ---
@@ -624,4 +691,4 @@ everyday-survey/
 
 ---
 
-*本ドキュメントは要件定義のドラフトであり、実装開始前に最終確認を行うこと。*
+*本ドキュメントは要件定義書であり、現行実装の状態を反映している。最終更新: 2026-03-22。*
