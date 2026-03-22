@@ -1,7 +1,7 @@
 # 実装詳細ドキュメント: AI Daily Survey
 
 **バージョン**: 現行実装
-**最終更新**: 2026-03-06
+**最終更新**: 2026-03-22
 
 ---
 
@@ -121,9 +121,10 @@ everyday-survey/
 │   └── app.log
 │
 └── docs/
-    ├── requirements.md            # 要件定義書（ドラフト）
+    ├── requirements.md            # 要件定義書
+    ├── implementation.md          # 本ドキュメント
     ├── article_format.md          # 記事フォーマット定義書
-    └── implementation.md          # 本ドキュメント
+    └── env.md                     # 環境変数の設定ガイド
 ```
 
 ---
@@ -140,7 +141,7 @@ everyday-survey/
 | CSS | Tailwind CSS | CDN 経由（Play CDN） |
 | DB | SQLite | aiosqlite + SQLAlchemy async |
 | データ保存 | JSON ファイル | `data/YYYY-MM-DD/` |
-| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-2.5-flash`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-2.5-pro`（`GEMINI_SUMMARY_MODEL`） |
+| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-2.5-flash`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-2.5-pro`（`GEMINI_SUMMARY_MODEL`）。チャットは `google-genai` SDK で Google Search グラウンディング付き |
 | スケジューラ | APScheduler (AsyncIOScheduler) | `Asia/Tokyo` JST 09:00 実行 |
 | 通知 | SMTP | 収集完了時にメール送信 |
 
@@ -245,7 +246,7 @@ JST 09:00 (APScheduler)
 |------|-----------|--------|----------|
 | 個別記事・論文の要約 | `summarizer.py` | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` |
 | 一面まとめ生成 | `digest.py` | `gemini-2.5-pro` | `GEMINI_SUMMARY_MODEL` |
-| チャット応答 | `chat.py` | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` |
+| チャット応答 | `chat.py` | `gemini-2.5-flash` + Google Search | `GEMINI_CHAT_MODEL` |
 
 ### 6.1 個別記事要約
 
@@ -365,11 +366,13 @@ CREATE TABLE chat_sessions (
 
 -- チャットメッセージ
 CREATE TABLE chat_messages (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  INTEGER NOT NULL REFERENCES chat_sessions(id),
-    role        TEXT NOT NULL,  -- "user" | "assistant"
-    content     TEXT NOT NULL,
-    created_at  DATETIME DEFAULT (CURRENT_TIMESTAMP)
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      INTEGER NOT NULL REFERENCES chat_sessions(id),
+    role            TEXT NOT NULL,  -- "user" | "assistant"
+    content         TEXT NOT NULL,
+    used_search     BOOLEAN DEFAULT 0,   -- Google Search グラウンディング使用フラグ
+    search_sources  TEXT,                 -- 検索ソース JSON ([{"title": "...", "uri": "..."}])
+    created_at      DATETIME DEFAULT (CURRENT_TIMESTAMP)
 );
 
 -- ユーザータグ（手動付与、article_id + tag でユニーク）
@@ -540,6 +543,7 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 | `GEMINI_API_KEY` | Google Gemini API キー |
 | `GEMINI_SUMMARY_MODEL` | 一面まとめ生成モデル（デフォルト: `gemini-2.5-pro`）— `digest.py` で使用 |
 | `GEMINI_CHAT_MODEL` | 個別記事要約・チャット応答モデル（デフォルト: `gemini-2.5-flash`）— `summarizer.py` / `chat.py` で使用 |
+| `GEMINI_SEARCH_THRESHOLD` | チャット時の Google Search グラウンディング閾値（デフォルト: `0.3`、0.0=常に検索、1.0=検索しない） |
 | `SMTP_HOST` | SMTP サーバーホスト |
 | `SMTP_PORT` | SMTP ポート |
 | `SMTP_USER` | SMTP ユーザー名 |
@@ -620,4 +624,4 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 
 ---
 
-*最終更新: 2026-03-06 — 企業動向の定量指標抽出・タグ一覧のユーザータグ分離表示・README ページ別機能ガイド追加を反映。*
+*最終更新: 2026-03-22 — Google Search グラウンディング統合・chat_messages スキーマ更新・GEMINI_SEARCH_THRESHOLD 追加・docs/env.md 追加を反映。*
