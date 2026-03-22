@@ -2,10 +2,12 @@
 日次一面まとめ（ダイジェスト）生成モジュール
 全カテゴリのデータを元に Gemini Pro で 2000文字のサマリーを生成し
 Markdown ファイルとして保存する
+プロンプトテンプレートは prompts/digest.md から読み込む
 """
 
 import logging
 import re
+from pathlib import Path
 
 import google.generativeai as genai
 
@@ -13,6 +15,8 @@ from app.config import settings
 from app.schemas import ArticleItem
 
 logger = logging.getLogger(__name__)
+
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 
 genai.configure(api_key=settings.gemini_api_key)
 
@@ -67,24 +71,19 @@ async def generate_digest(
     )
 
     coverage_date = target_date_str or date_str
-    prompt = f"""以下は {coverage_date} の AI 関連の最新情報です。
-これらの情報を元に、「先日の AI 動向まとめ」として新聞の一面のような
-わかりやすい日本語のサマリーを作成してください。
 
-## 要件
-- **必ず Markdown 形式で出力すること**（見出し `##`、箇条書き `-`、太字 `**` などを積極的に活用）
-- 2000文字以内で記述すること
-- 「最低限これだけ読めばよい」という視点で重要な情報を優先する
-- 各カテゴリから注目すべきトピックを 2〜3 点ずつ取り上げる
-- 全体的な AI 動向の流れやトレンドも所感として加える
-- Markdown 形式で出力する（見出し・箇条書きを活用）
-- 出力の先頭に「# {coverage_date} AI 動向まとめ」という見出しを付ける
-- 記事の内容を引用する際は `[ref:safe_id]` の形式を文中に自然に埋め込んでください（例: [ref:arxiv-2603-12345]）
-- 引用は1段落につき1〜2つ程度にとどめ、不自然にならないよう注意してください
-
-## 収集情報
-{context}
-"""
+    # テンプレート読み込み
+    template_path = _PROMPTS_DIR / "digest.md"
+    if template_path.exists():
+        template = template_path.read_text(encoding="utf-8")
+    else:
+        logger.warning(f"ダイジェストテンプレートが見つかりません: {template_path}")
+        template = (
+            "以下は {coverage_date} の AI 関連の最新情報です。\n"
+            "日本語のサマリーを Markdown 形式で作成してください。\n\n"
+            "## 収集情報\n{context}"
+        )
+    prompt = template.format(coverage_date=coverage_date, context=context)
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(

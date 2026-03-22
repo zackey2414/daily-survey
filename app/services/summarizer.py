@@ -1,11 +1,13 @@
 """
 Gemini API を使った要約処理モジュール
 個別記事・論文の要約には gemini-2.5-flash を使用する（一面まとめは digest.py で gemini-2.5-pro を使用）
+プロンプトテンプレートは prompts/ ディレクトリの .md ファイルから読み込む
 """
 
 import asyncio
 import logging
 import re
+from pathlib import Path
 from typing import Literal
 
 import google.generativeai as genai
@@ -14,6 +16,18 @@ from app.config import settings
 from app.schemas import ArticleItem
 
 logger = logging.getLogger(__name__)
+
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
+
+
+def _load_template(name: str) -> str:
+    """prompts/ ディレクトリからテンプレートを読み込む。ファイルがなければ空文字を返す。"""
+    path = _PROMPTS_DIR / name
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    logger.warning(f"プロンプトテンプレートが見つかりません: {path}")
+    return ""
+
 
 # Gemini API の設定
 genai.configure(api_key=settings.gemini_api_key)
@@ -61,109 +75,26 @@ def _build_prompt(
     item: ArticleItem, category: Literal["paper", "article", "industry"]
 ) -> str:
     if category == "paper":
-        return f"""以下の論文を日本語で詳しく要約してください。
-必ず以下のフォーマットで出力してください（Markdown 形式）。
-
-【日本語タイトル】
-（論文タイトルの自然な日本語訳）
-
-【概要】
-（何をした研究か、2〜3文で説明）
-
-【新規性・貢献】
-（既存研究との違いや本論文の貢献を具体的に説明）
-
-【メタ的な学び】
-この論文の内容自体ではなく、以下の観点からメタレベルの学びを2〜3文で具体的に記述してください。
-- 問題の定式化の仕方（何を入力・出力とし何を最適化しているか）
-- アプローチの独自性（既存手法の組み合わせ方、着眼点）
-- 評価手法・指標の選択から学べること
-
-【手法の概要】
-（提案手法を簡潔に説明）
-
-【実験結果のポイント】
-（主な実験結果や性能向上の数値など）
-
-【タグ】
-以下のルールに従ってタグを生成し、スペース区切りで列挙すること。
-1. この論文が取り組む**タスク名**を必ず最初に1つ含める（例: 画像検索・物体中心画像検索・動画サンプリング・物体検知・セグメンテーション・動画像分類・姿勢推定・画像生成・テキスト分類・機械翻訳・質問応答・要約・固有表現認識 など、論文内容に最も合致するタスク名を日本語で）
-2. 内容を表すキーワードを合計7個程度生成する
-3. タイトルに含まれる技術的固有名詞（モデル名・手法名・データセット名など）は必ず含める
-4. LLM・VLM・拡散モデルなど特定のモデルカテゴリに該当する場合、そのモデル名と「LLM」「VLM」「拡散モデル」等のカテゴリ名を両方含める
-例: 画像検索 CLIP マルチモーダル 物体中心 ベンチマーク 自己教師あり学習 ViT
-
----
-タイトル: {item.title_en}
-著者: {", ".join(item.authors[:5])}
-アブストラクト:
-{item.abstract_en}
-"""
+        template = _load_template("summary_paper.md")
+        return template.format(
+            title_en=item.title_en,
+            authors=", ".join(item.authors[:5]),
+            abstract_en=item.abstract_en,
+        )
     elif category == "industry":
-        return f"""以下の AI 企業動向に関する記事・発表を日本語で要約してください。
-必ず以下のフォーマットで出力してください（Markdown 形式）。
-
-【日本語タイトル】
-（タイトルの自然な日本語訳、または日本語の場合はそのまま）
-
-【概要】
-（何が発表・議論されているか、2〜3文で説明）
-
-【ポイント】
-- （重要ポイント1）
-- （重要ポイント2）
-- （重要ポイント3）
-
-【定量指標】
-記事内に性能・技術に関する定量的な数値がある場合は、以下の形式で列挙してください。
-なければ「なし」と出力してください。
-- ベンチマーク名: スコア（従来手法比 +XX% / 従来: YY → 新: ZZ 等）
-例:
-- MMLU: 92.3%（GPT-4比 +3.1%）
-- 推論速度: 従来比 2.4倍高速化
-- コンテキスト長: 1M トークン（従来の8倍）
-
-【タグ】
-以下のルールに従ってタグを生成し、スペース区切りで列挙すること。
-1. 内容を表すキーワードを合計5個程度生成する
-2. タイトルに含まれる技術的固有名詞（モデル名・サービス名・フレームワーク名など）は必ず含める
-3. LLM・VLM・画像生成など特定のモデルカテゴリに該当する場合、そのモデル名と「LLM」「VLM」等のカテゴリ名を両方含める
-例: Claude3.5 LLM Anthropic APIリリース マルチモーダル
-
----
-タイトル: {item.title_en or item.title_ja}
-ソース: {item.source_name}
-内容:
-{item.abstract_en[:1500]}
-"""
+        template = _load_template("summary_industry.md")
+        return template.format(
+            title=item.title_en or item.title_ja,
+            source_name=item.source_name,
+            content=item.abstract_en[:1500],
+        )
     else:
-        return f"""以下の記事・ニュースを日本語で要約してください。
-必ず以下のフォーマットで出力してください（Markdown 形式）。
-
-【日本語タイトル】
-（タイトルの自然な日本語訳、または日本語の場合はそのまま）
-
-【概要】
-（何が発表・議論されているか、2〜3文で説明）
-
-【ポイント】
-- （重要ポイント1）
-- （重要ポイント2）
-- （重要ポイント3）
-
-【タグ】
-以下のルールに従ってタグを生成し、スペース区切りで列挙すること。
-1. 内容を表すキーワードを合計5個程度生成する
-2. タイトルに含まれる技術的固有名詞（モデル名・サービス名・フレームワーク名など）は必ず含める
-3. LLM・VLM・画像生成など特定のモデルカテゴリに該当する場合、そのモデル名と「LLM」「VLM」等のカテゴリ名を両方含める
-例: Claude3.5 LLM Anthropic APIリリース マルチモーダル
-
----
-タイトル: {item.title_en or item.title_ja}
-ソース: {item.source_name}
-内容:
-{item.abstract_en[:1000]}
-"""
+        template = _load_template("summary_article.md")
+        return template.format(
+            title=item.title_en or item.title_ja,
+            source_name=item.source_name,
+            content=item.abstract_en[:1000],
+        )
 
 
 def _parse_result(
