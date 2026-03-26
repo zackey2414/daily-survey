@@ -21,6 +21,7 @@ RUN uv sync --no-dev --no-install-project
 
 # アプリケーションコードのコピー
 COPY app/ ./app/
+COPY prompts/ ./prompts/
 
 # 必要なディレクトリを作成し、実行ユーザー(1001)に権限を付与
 RUN mkdir -p data summaries db logs && chown -R 1001:1001 /app
