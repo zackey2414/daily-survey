@@ -19,10 +19,15 @@
       <option value="{{ d }}" {% if d == date_str %}selected{% endif %}>{{ d }}</option>
       {% endfor %}
     </select>
+    {% set has_existing_data = digest_html or cv_papers or lg_papers or ai_papers or cl_papers or industry_items or community_items or python_items %}
     <button
       hx-post="/admin/run-pipeline"
-      hx-confirm="パイプラインを手動実行しますか？"
       hx-target="#pipeline-status"
+      {% if has_existing_data %}
+      hx-confirm="⚠️ {{ date_str }} の収集データはすでに存在します。再実行すると既存の収集データ・要約・一面まとめがすべて上書きされます。実行しますか？"
+      {% else %}
+      hx-confirm="パイプラインを手動実行しますか？"
+      {% endif %}
       class="inline-flex items-center gap-1.5 bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm">
       ▶ 今すぐ収集
     </button>
