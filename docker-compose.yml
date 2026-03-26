@@ -11,6 +11,7 @@ services:
       - ./db:/app/db
       - ./logs:/app/logs
       - ./app:/app/app  # 開発時のホットリロード用
+      - ./prompts:/app/prompts  # プロンプトテンプレート
     user: "1001:1001"
     env_file:
       - .env
