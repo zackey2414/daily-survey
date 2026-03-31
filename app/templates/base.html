@@ -20,11 +20,20 @@
         open: false,
         loaded: false,
         dateStr: '',
+        _updateBodyScroll(isOpen) {
+          // モバイル（lg未満）でチャットオープン時はbodyスクロールをロック
+          if (window.innerWidth < 1024 && isOpen) {
+            document.body.style.overflow = 'hidden';
+          } else {
+            document.body.style.overflow = '';
+          }
+        },
         toggle(dateStr) {
-          if (this.open) { this.open = false; return; }
+          if (this.open) { this.open = false; this._updateBodyScroll(false); return; }
           var needLoad = !this.loaded || this.dateStr !== dateStr;
           this.dateStr = dateStr;
           this.open = true;
+          this._updateBodyScroll(true);
           if (needLoad) {
             this.loaded = true;
             var url = '/daily-chat/' + dateStr + '/sessions/latest';
@@ -36,6 +45,17 @@
             if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
           }
         }
+      });
+
+      // dailyChat.open の変更を監視してスクロールロックを同期（Escape等で閉じた場合にも対応）
+      Alpine.effect(() => {
+        var store = Alpine.store('dailyChat');
+        if (store) store._updateBodyScroll(store.open);
+      });
+      // リサイズ時にもスクロールロック状態を再評価
+      window.addEventListener('resize', () => {
+        var store = Alpine.store('dailyChat');
+        if (store) store._updateBodyScroll(store.open);
       });
     });
   </script>
@@ -511,10 +531,13 @@
 
   function updateFabs() {
     var scrolled = window.scrollY > 200;
-    btnTop.style.display = scrolled ? 'flex' : 'none';
 
     // チャットパネルが開いているか
     var chatOpen = window.Alpine && Alpine.store('dailyChat') && Alpine.store('dailyChat').open;
+    // モバイル（lg未満）でチャットが開いている場合はFABを全て非表示
+    var mobileChat = chatOpen && window.innerWidth < 1024;
+
+    btnTop.style.display = (scrolled && !mobileChat) ? 'flex' : 'none';
 
     // チャットFAB: スクロール済み + チャット未表示時のみ
     fabChat.style.display = (scrolled && !chatOpen) ? 'flex' : 'none';
