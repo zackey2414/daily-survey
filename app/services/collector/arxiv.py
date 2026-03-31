@@ -67,12 +67,26 @@ async def collect_arxiv(
     )
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            resp = await client.get(ARXIV_API_URL, params=params)
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            logger.error(f"arXiv API エラー ({category}): {e}")
-            return []
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                resp = await client.get(ARXIV_API_URL, params=params)
+                resp.raise_for_status()
+                break
+            except httpx.HTTPError as e:
+                if attempt < max_retries - 1 and (
+                    isinstance(e, httpx.HTTPStatusError)
+                    and e.response.status_code == 429
+                ):
+                    wait = 5 * (2**attempt)  # 5s, 10s, 20s
+                    logger.warning(
+                        f"arXiv API 429 ({category}): {wait}秒後にリトライ "
+                        f"(試行 {attempt + 1}/{max_retries})"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                logger.error(f"arXiv API エラー ({category}): {e}")
+                return []
 
     items = _parse_arxiv_xml(resp.text, category, target_date)
     items = items[:max_results]
@@ -195,12 +209,15 @@ async def collect_arxiv_cv(
 async def collect_all_arxiv(
     target_date: date | None = None,
 ) -> dict[str, list[ArticleItem]]:
-    """LG / AI / CL カテゴリを並列収集する（CV は collect_arxiv_cv を使うこと）"""
+    """LG / AI / CL カテゴリを順次収集する（API レートリミット対策で間隔を空ける）"""
     categories: list[ArxivCategory] = ["cs.LG", "cs.AI", "cs.CL"]
-    results = await asyncio.gather(
-        *[collect_arxiv(cat, target_date) for cat in categories],
-        return_exceptions=True,
-    )
-    return {
-        cat: (r if isinstance(r, list) else []) for cat, r in zip(categories, results)
-    }
+    result: dict[str, list[ArticleItem]] = {}
+    for cat in categories:
+        try:
+            items = await collect_arxiv(cat, target_date)
+            result[cat] = items
+        except Exception as e:
+            logger.error(f"{cat} 収集失敗: {e}")
+            result[cat] = []
+        await asyncio.sleep(3)  # arXiv API 推奨間隔
+    return result

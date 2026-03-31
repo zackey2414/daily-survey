@@ -66,7 +66,9 @@ async def archive_day(
     if digest_raw:
         processed = inject_citations(digest_raw, date_str, is_archive=True)
         digest_html = md.markdown(
-            processed, extensions=["fenced_code", "tables", "nl2br"]
+            processed,
+            extensions=["fenced_code", "tables", "nl2br"],
+            tab_length=2,
         )
     else:
         digest_html = None

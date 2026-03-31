@@ -60,6 +60,7 @@ async def summary_detail(request: Request, date_str: str):
     html_content = md.markdown(
         processed,
         extensions=["fenced_code", "tables", "toc", "nl2br"],
+        tab_length=2,
     )
 
     return templates.TemplateResponse(

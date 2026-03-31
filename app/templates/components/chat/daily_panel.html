@@ -1,0 +1,141 @@
+<!--
+  日毎チャットパネル (daily_panel.html)
+  必要変数:
+    date_str       : str (YYYY-MM-DD)
+    session        : ChatSession
+    messages       : list[ChatMessage]
+    all_sessions   : list[ChatSession]
+    current_index  : int
+    total_sessions : int
+-->
+<div class="bg-white h-full flex flex-col" id="daily-chat-container">
+
+  <!-- チャットヘッダー -->
+  <div class="px-3 py-2 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm shrink-0">
+    <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+      <span class="text-gray-500 shrink-0">{{ date_str }} チャット</span>
+
+      {% if current_index > 0 %}
+      <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
+              hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index - 1].id }}"
+              hx-target="#daily-chat-panel"
+              hx-swap="innerHTML">
+        ‹
+      </button>
+      {% else %}
+      <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>‹</button>
+      {% endif %}
+
+      <span class="text-gray-700 font-medium truncate max-w-[120px] sm:max-w-48">{{ session.title }}</span>
+
+      {% if current_index < total_sessions - 1 %}
+      <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
+              hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index + 1].id }}"
+              hx-target="#daily-chat-panel"
+              hx-swap="innerHTML">
+        ›
+      </button>
+      {% else %}
+      <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>›</button>
+      {% endif %}
+
+      <span class="text-xs text-gray-400 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
+    </div>
+
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button class="flex items-center gap-1 text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-lg hover:bg-emerald-700 transition"
+              hx-post="/daily-chat/{{ date_str }}/sessions"
+              hx-target="#daily-chat-panel"
+              hx-swap="innerHTML">
+        + 新規チャット
+      </button>
+      <button class="flex items-center gap-1 text-xs bg-white text-red-500 border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition"
+              hx-delete="/daily-chat/{{ date_str }}/sessions/{{ session.id }}"
+              hx-confirm="このチャット「{{ session.title }}」を削除しますか？&#10;この操作は取り消せません。"
+              hx-target="#daily-chat-panel"
+              hx-swap="innerHTML">
+        削除
+      </button>
+    </div>
+  </div>
+
+  <!-- メッセージ一覧 -->
+  <div class="chat-messages px-4 py-3 space-y-3 overflow-y-auto flex-1"
+       id="daily-messages-{{ session.id }}">
+    {% for msg in messages %}
+    {% include "components/chat/message_item.html" %}
+    {% endfor %}
+    {% if not messages %}
+    <p class="text-center text-gray-400 text-sm py-4">
+      {{ date_str }} の記事全体について質問してください
+    </p>
+    {% endif %}
+  </div>
+
+  <!-- 入力フォーム -->
+  <form class="px-4 py-3 border-t bg-gray-50 flex gap-2 items-end shrink-0"
+        id="daily-chat-form-{{ session.id }}"
+        hx-post="/daily-chat/{{ date_str }}/sessions/{{ session.id }}/messages"
+        hx-target="#daily-messages-{{ session.id }}"
+        hx-swap="beforeend"
+        hx-on::before-request="
+          var msgs = document.getElementById('daily-messages-{{ session.id }}');
+          var t = document.createElement('div');
+          t.id = 'daily-thinking-{{ session.id }}';
+          t.className = 'flex justify-start';
+          t.innerHTML = `<div class='bg-gray-100 rounded-2xl px-4 py-2.5 text-sm text-gray-500'>
+            <div class='flex items-center gap-2'>
+              <span class='inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin'></span>
+              <span id='daily-thinking-label-{{ session.id }}'>思考中...</span>
+            </div>
+          </div>`;
+          msgs.appendChild(t);
+          msgs.scrollTop = 9999;
+          this._searchTimer = setTimeout(function(){
+            var label = document.getElementById('daily-thinking-label-{{ session.id }}');
+            if (!label) return;
+            label.closest('.bg-gray-100').innerHTML = `
+              <div class='flex items-center gap-2'>
+                <svg class='w-3.5 h-3.5 animate-spin text-blue-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/>
+                </svg>
+                <span class='text-blue-600'>Web検索中...</span>
+              </div>
+              <div class='mt-1 flex gap-1'>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:0ms'></span>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:150ms'></span>
+                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:300ms'></span>
+              </div>`;
+          }, 3000);
+          var btn = document.getElementById('daily-chat-submit-{{ session.id }}');
+          btn.disabled = true;
+          btn.classList.add('opacity-40', 'cursor-not-allowed');
+          btn.classList.remove('hover:bg-blue-700');
+        "
+        hx-on::after-request="
+          if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
+          var t = document.getElementById('daily-thinking-{{ session.id }}');
+          if (t) t.remove();
+          this.reset();
+          var ta = this.querySelector('textarea');
+          if (ta) ta.style.height = 'auto';
+          var btn = document.getElementById('daily-chat-submit-{{ session.id }}');
+          btn.disabled = false;
+          btn.classList.remove('opacity-40', 'cursor-not-allowed');
+          btn.classList.add('hover:bg-blue-700');
+          document.getElementById('daily-messages-{{ session.id }}').scrollTop = 9999;
+        ">
+    <textarea name="message" required rows="1"
+              placeholder="今日の記事について質問… (Ctrl+Enter で送信)"
+              class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-hidden"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();this.closest('form').requestSubmit();}"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
+    <button type="submit"
+            id="daily-chat-submit-{{ session.id }}"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition shrink-0">
+      送信
+    </button>
+  </form>
+
+</div>

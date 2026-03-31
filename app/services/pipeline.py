@@ -47,19 +47,32 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     report = CollectionReport(date_str=collection_date_str)
     errors: list[str] = []
 
-    # ── 1. 並列収集 ────────────────────────────────────────────
+    # ── 1. 収集 ─────────────────────────────────────────────────
     logger.info("収集開始...")
+
+    # arXiv は順次収集（API レートリミット対策）
+    cv_arxiv_papers: list[ArticleItem] = []
+    try:
+        cv_arxiv_papers = await collect_arxiv_cv(target_date)
+    except Exception as e:
+        errors.append(f"arXiv cs.CV: {e}")
+        logger.error(f"arXiv cs.CV 収集失敗: {e}")
+    await asyncio.sleep(3)
+    arxiv_results: dict[str, list[ArticleItem]] = {}
+    try:
+        arxiv_results = await collect_all_arxiv(target_date)
+    except Exception as e:
+        errors.append(f"arXiv: {e}")
+        logger.error(f"arXiv 収集失敗: {e}")
+
+    # 他ソースは並列収集
     (
-        arxiv_results,
-        cv_arxiv_papers,
         openreview_items,
         industry_items,
         industry_news_items,
         community_items,
         python_items,
     ) = await asyncio.gather(
-        collect_all_arxiv(target_date),  # cs.LG / cs.AI / cs.CL
-        collect_arxiv_cv(target_date),  # cs.CV 優先度付き最大40件
         collect_openreview(target_date),
         collect_industry(target_date),
         collect_industry_news(target_date),
@@ -76,10 +89,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
             return default
         return result
 
-    arxiv_results = _safe(
-        arxiv_results, "arXiv", {"cs.LG": [], "cs.AI": [], "cs.CL": []}
-    )
-    cv_arxiv_papers = _safe(cv_arxiv_papers, "arXiv cs.CV", [])
+    # arXiv は上で個別にエラーハンドリング済み
     openreview_items = _safe(openreview_items, "OpenReview", [])
     industry_items = _safe(industry_items, "Industry", [])
     industry_news_items = _safe(industry_news_items, "Industry News", [])

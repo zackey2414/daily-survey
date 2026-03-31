@@ -14,6 +14,24 @@
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
   <!-- Alpine.js -->
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.store('dailyChat', {
+        open: false,
+        loaded: false,
+        dateStr: '',
+        toggle(dateStr) {
+          if (this.open) { this.open = false; return; }
+          this.dateStr = dateStr;
+          this.open = true;
+          if (!this.loaded || this.dateStr !== dateStr) {
+            this.loaded = true;
+            htmx.ajax('GET', '/daily-chat/' + dateStr + '/sessions/latest', {target: '#daily-chat-panel', swap: 'innerHTML'});
+          }
+        }
+      });
+    });
+  </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     *, body { font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif; }
