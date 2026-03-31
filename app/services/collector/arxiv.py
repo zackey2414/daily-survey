@@ -30,12 +30,16 @@ async def collect_arxiv(
     category: ArxivCategory,
     target_date: date | None = None,
     max_results: int | None = None,
+    *,
+    client: httpx.AsyncClient | None = None,
 ) -> list[ArticleItem]:
     """
     指定カテゴリの arXiv 論文を収集する。
 
     target_date (JST 前日) の 00:00〜23:59 JST に投稿された論文のみを返す。
     UTC 換算: (target_date - 1日) 15:00:00 〜 target_date 14:59:59
+
+    client を渡すと既存の httpx.AsyncClient を再利用する（直列収集向け）。
     """
     if target_date is None:
         target_date = date.today() - timedelta(days=1)
@@ -66,29 +70,44 @@ async def collect_arxiv(
         f"(UTC: {from_str} 〜 {to_str})"
     )
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        max_retries = 3
+    max_retries = 5
+    resp = None
+
+    async def _fetch(c: httpx.AsyncClient) -> httpx.Response | None:
+        nonlocal resp
         for attempt in range(max_retries):
             try:
-                resp = await client.get(ARXIV_API_URL, params=params)
+                resp = await c.get(ARXIV_API_URL, params=params)
                 resp.raise_for_status()
-                break
-            except httpx.HTTPError as e:
-                if attempt < max_retries - 1 and (
-                    isinstance(e, httpx.HTTPStatusError)
-                    and e.response.status_code == 429
-                ):
-                    wait = 5 * (2**attempt)  # 5s, 10s, 20s
+                return resp
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                retryable = status == 429 or status >= 500
+                if attempt < max_retries - 1 and retryable:
+                    wait = 10 * (2**attempt)  # 10s, 20s, 40s, 80s
                     logger.warning(
-                        f"arXiv API 429 ({category}): {wait}秒後にリトライ "
-                        f"(試行 {attempt + 1}/{max_retries})"
+                        f"arXiv API {status} ({category}): "
+                        f"{wait}秒後にリトライ (試行 {attempt + 1}/{max_retries})"
                     )
                     await asyncio.sleep(wait)
                     continue
                 logger.error(f"arXiv API エラー ({category}): {e}")
-                return []
+                return None
+            except httpx.HTTPError as e:
+                logger.error(f"arXiv API エラー ({category}): {e}")
+                return None
+        return None
 
-    items = _parse_arxiv_xml(resp.text, category, target_date)
+    if client is not None:
+        result = await _fetch(client)
+    else:
+        async with httpx.AsyncClient(timeout=90.0) as c:
+            result = await _fetch(c)
+
+    if result is None:
+        return []
+
+    items = _parse_arxiv_xml(result.text, category, target_date)
     items = items[:max_results]
     logger.info(f"arXiv 収集完了: {category} / {len(items)} 件")
     return items
@@ -194,6 +213,8 @@ def _cv_priority_score(item: ArticleItem) -> int:
 async def collect_arxiv_cv(
     target_date: date | None = None,
     max_results: int = 40,
+    *,
+    client: httpx.AsyncClient | None = None,
 ) -> list[ArticleItem]:
     """
     cs.CV 論文をトピック優先度付きで収集する（最大 max_results 件）。
@@ -201,23 +222,47 @@ async def collect_arxiv_cv(
     多めに取得してから優先度でソートし上位 max_results 件を返す。
     優先度: 画像検索系 > 分類・検知・セグメンテーション > その他 CV
     """
-    raw = await collect_arxiv("cs.CV", target_date, max_results=max_results * 2)
+    raw = await collect_arxiv(
+        "cs.CV", target_date, max_results=max_results * 2, client=client
+    )
     sorted_items = sorted(raw, key=lambda item: _cv_priority_score(item))
     return sorted_items[:max_results]
 
 
-async def collect_all_arxiv(
+# カテゴリ間の待機秒数（arXiv API のレートリミットを避けるため余裕を持たせる）
+_INTER_CATEGORY_DELAY = 5
+
+
+async def collect_all_arxiv_serial(
     target_date: date | None = None,
-) -> dict[str, list[ArticleItem]]:
-    """LG / AI / CL カテゴリを順次収集する（API レートリミット対策で間隔を空ける）"""
+) -> tuple[list[ArticleItem], dict[str, list[ArticleItem]]]:
+    """
+    全 arXiv カテゴリ（cs.CV, cs.LG, cs.AI, cs.CL）を1つのクライアントで直列に収集する。
+
+    カテゴリ間に十分な待機時間を設けて 429 を回避する。
+    Returns: (cv_papers, {category: papers})
+    """
     categories: list[ArxivCategory] = ["cs.LG", "cs.AI", "cs.CL"]
-    result: dict[str, list[ArticleItem]] = {}
-    for cat in categories:
+
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        # 1) cs.CV（優先度付き）
         try:
-            items = await collect_arxiv(cat, target_date)
-            result[cat] = items
+            cv_papers = await collect_arxiv_cv(target_date, client=client)
         except Exception as e:
-            logger.error(f"{cat} 収集失敗: {e}")
-            result[cat] = []
-        await asyncio.sleep(3)  # arXiv API 推奨間隔
-    return result
+            logger.error(f"arXiv cs.CV 収集失敗: {e}")
+            cv_papers = []
+
+        await asyncio.sleep(_INTER_CATEGORY_DELAY)
+
+        # 2) LG / AI / CL を直列に収集
+        other_results: dict[str, list[ArticleItem]] = {}
+        for cat in categories:
+            try:
+                items = await collect_arxiv(cat, target_date, client=client)
+                other_results[cat] = items
+            except Exception as e:
+                logger.error(f"{cat} 収集失敗: {e}")
+                other_results[cat] = []
+            await asyncio.sleep(_INTER_CATEGORY_DELAY)
+
+    return cv_papers, other_results
