@@ -13,7 +13,10 @@
   <!-- チャットヘッダー -->
   <div class="px-3 py-2 bg-blue-600 text-white border-b border-blue-700 flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm shrink-0">
     <div class="flex items-center gap-1 sm:gap-2 min-w-0">
-      <span class="text-blue-100 shrink-0">{{ date_str }} チャット</span>
+      <button onclick="if(window.Alpine)Alpine.store('dailyChat').open=false"
+              class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-400 text-white transition shrink-0 text-xs"
+              title="チャットを閉じる">✕</button>
+      <span class="text-blue-100 shrink-0">{{ date_str }}</span>
 
       {% if current_index > 0 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
