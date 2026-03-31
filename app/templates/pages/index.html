@@ -12,7 +12,7 @@
       収集: <span class="text-slate-500">{{ date_str }}</span>
     </p>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
+  <div x-data class="flex flex-wrap items-center gap-2">
     <select onchange="location.href='/archive/' + this.value"
             class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer text-slate-700">
       {% for d in available_dates %}
@@ -30,6 +30,12 @@
       {% endif %}
       class="inline-flex items-center gap-1.5 bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm">
       ▶ 今すぐ収集
+    </button>
+    <button
+      @click="$store.dailyChat.toggle('{{ date_str }}')"
+      :class="$store.dailyChat.open ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'"
+      class="inline-flex items-center gap-1.5 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      💬 今日のチャット
     </button>
     <span id="pipeline-status" class="text-xs text-slate-500"></span>
   </div>
@@ -219,4 +225,56 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block daily_chat_panel %}
+<!-- 広い画面: メインコンテンツの横に並ぶパネル -->
+<div x-data @keydown.escape.window="$store.dailyChat.open = false"
+     :class="$store.dailyChat.open ? 'lg:w-[420px] lg:opacity-100' : 'lg:w-0 lg:opacity-0 lg:overflow-hidden'"
+     class="hidden lg:flex flex-col shrink-0 bg-blue-50 border-l border-blue-200 sticky top-[52px] h-[calc(100vh-52px)] transition-all duration-300 ease-out">
+  <!-- チャットコンテンツ（HTMX で差し替え） -->
+  <div id="daily-chat-panel" class="flex-1 flex flex-col overflow-hidden w-[420px]">
+    <div class="flex items-center justify-center h-full text-blue-400 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></span>
+        チャットを読み込み中...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 狭い画面: オーバーレイ方式のサイドパネル -->
+<div x-data x-show="$store.dailyChat.open" x-cloak
+     @keydown.escape.window="$store.dailyChat.open = false"
+     class="lg:hidden fixed inset-0 z-50 flex justify-end">
+  <!-- オーバーレイ背景 -->
+  <div x-show="$store.dailyChat.open"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @click="$store.dailyChat.open = false"
+       class="absolute inset-0 bg-black/20"></div>
+  <!-- パネル本体 -->
+  <div x-show="$store.dailyChat.open"
+       x-transition:enter="transition ease-out duration-300 transform"
+       x-transition:enter-start="translate-x-full"
+       x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-200 transform"
+       x-transition:leave-start="translate-x-0"
+       x-transition:leave-end="translate-x-full"
+       class="relative w-full max-w-md bg-blue-50 shadow-2xl border-l border-blue-200 flex flex-col h-full">
+    <!-- モバイル用チャットコンテンツ（HTMX で差し替え） -->
+    <div id="daily-chat-panel-mobile" class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex items-center justify-center h-full text-blue-400 text-sm">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></span>
+          チャットを読み込み中...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -293,9 +293,20 @@ async def search_chats(
     result = await db.execute(stmt)
     sessions = result.scalars().all()
 
+    article_sessions = [s for s in sessions if s.article_id is not None]
+    daily_sessions = [
+        s for s in sessions if s.article_id is None and s.date is not None
+    ]
+
     return templates.TemplateResponse(
         "pages/chat_search.html",
-        {"request": request, "sessions": sessions, "query": q},
+        {
+            "request": request,
+            "sessions": sessions,
+            "article_sessions": article_sessions,
+            "daily_sessions": daily_sessions,
+            "query": q,
+        },
     )
 
 

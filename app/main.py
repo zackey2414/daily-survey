@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.db.database import init_db, migrate_db
 from app.jinja import templates
-from app.routers import archive, chat, main_page, summaries, tags, user_tags
+from app.routers import archive, chat, daily_chat, main_page, summaries, tags, user_tags
 from app.scheduler import start_scheduler, stop_scheduler
 
 # ログ設定
@@ -60,6 +60,7 @@ app.include_router(tags.router)
 app.include_router(archive.router)
 app.include_router(summaries.router)
 app.include_router(chat.router)
+app.include_router(daily_chat.router)
 app.include_router(user_tags.router)
 
 

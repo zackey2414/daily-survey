@@ -14,6 +14,31 @@
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
   <!-- Alpine.js -->
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.store('dailyChat', {
+        open: false,
+        loaded: false,
+        dateStr: '',
+        toggle(dateStr) {
+          if (this.open) { this.open = false; return; }
+          var needLoad = !this.loaded || this.dateStr !== dateStr;
+          this.dateStr = dateStr;
+          this.open = true;
+          if (needLoad) {
+            this.loaded = true;
+            var url = '/daily-chat/' + dateStr + '/sessions/latest';
+            // 広い画面用パネル
+            var desktop = document.getElementById('daily-chat-panel');
+            if (desktop) htmx.ajax('GET', url, {target: '#daily-chat-panel', swap: 'innerHTML'});
+            // 狭い画面用パネル
+            var mobile = document.getElementById('daily-chat-panel-mobile');
+            if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
+          }
+        }
+      });
+    });
+  </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     *, body { font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif; }
@@ -47,8 +72,10 @@
     .prose code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: #475569; }
     .prose blockquote { border-left: 3px solid #c7d2fe; padding-left: 1rem; color: #6b7280; margin: 0.75rem 0; font-style: italic; }
 
-    /* チャット */
-    .chat-messages { max-height: 400px; overflow-y: auto; }
+    /* チャット（記事カード内埋め込み用） */
+    .card .chat-messages { max-height: 400px; overflow-y: auto; }
+    /* 日毎チャットパネルではflex-1で全高さを使う */
+    #daily-chat-container .chat-messages { max-height: none; }
 
     /* アニメーション */
     [x-show] { transition-property: opacity, transform; }
@@ -99,24 +126,28 @@
            {% else %}
              text-slate-400 hover:text-white hover:bg-white/10
            {% endif %}">
-        チャット
+        チャット履歴
       </a>
     </nav>
   </div>
 </nav>
 
-<!-- メインコンテンツ -->
-<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-  {% block content %}{% endblock %}
-</main>
-
-<!-- フッター -->
-<footer class="mt-16 py-6 border-t border-slate-200">
-  <div class="text-center space-y-1">
-    <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
-    <p class="text-slate-400 text-xs">毎朝 09:00 JST 自動更新</p>
+<!-- メインコンテンツ + 日毎チャットパネルの横並びレイアウト -->
+<div class="flex min-h-[calc(100vh-52px)]">
+  <div class="flex-1 min-w-0 transition-all duration-300">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {% block content %}{% endblock %}
+    </main>
+    <!-- フッター -->
+    <footer class="mt-16 py-6 border-t border-slate-200">
+      <div class="text-center space-y-1">
+        <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
+        <p class="text-slate-400 text-xs">毎朝 09:00 JST 自動更新</p>
+      </div>
+    </footer>
   </div>
-</footer>
+  {% block daily_chat_panel %}{% endblock %}
+</div>
 
 <!-- セクションスティッキーブロック: 元のトグルボタンをクローンして上部からスライドイン -->
 <script>
@@ -442,22 +473,65 @@
 }());
 </script>
 
-<!-- ページトップに戻るボタン -->
-<button id="back-to-top"
-        onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
-        title="ページトップに戻る"
-        style="display:none"
-        class="fixed bottom-6 right-6 z-50 w-11 h-11 rounded-full bg-slate-700 text-white shadow-lg flex items-center justify-center hover:bg-slate-600 active:scale-95 transition-all duration-150">
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
-  </svg>
-</button>
+<!-- フローティングボタン群 -->
+<div id="fab-group" class="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2 transition-all duration-300">
+  <!-- チャット呼び出しFAB（スクロール時 + チャット未表示時のみ） -->
+  <button id="fab-chat"
+          style="display:none"
+          title="今日のチャットを開く"
+          class="w-11 h-11 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all duration-150">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+    </svg>
+  </button>
+  <!-- ページトップに戻るボタン -->
+  <button id="back-to-top"
+          onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+          title="ページトップに戻る"
+          style="display:none"
+          class="w-11 h-11 rounded-full bg-slate-700 text-white shadow-lg flex items-center justify-center hover:bg-slate-600 active:scale-95 transition-all duration-150">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
+    </svg>
+  </button>
+</div>
 <script>
 (function(){
-  var btn = document.getElementById('back-to-top');
-  window.addEventListener('scroll', function(){
-    btn.style.display = window.scrollY > 200 ? 'flex' : 'none';
-  }, {passive: true});
+  var fabGroup = document.getElementById('fab-group');
+  var btnTop = document.getElementById('back-to-top');
+  var fabChat = document.getElementById('fab-chat');
+
+  // チャットFABクリック: Alpine store のtoggleを呼ぶ
+  fabChat.addEventListener('click', function() {
+    if (window.Alpine && Alpine.store('dailyChat')) {
+      var dateStr = Alpine.store('dailyChat').dateStr;
+      if (dateStr) Alpine.store('dailyChat').toggle(dateStr);
+    }
+  });
+
+  function updateFabs() {
+    var scrolled = window.scrollY > 200;
+    btnTop.style.display = scrolled ? 'flex' : 'none';
+
+    // チャットパネルが開いているか
+    var chatOpen = window.Alpine && Alpine.store('dailyChat') && Alpine.store('dailyChat').open;
+
+    // チャットFAB: スクロール済み + チャット未表示時のみ
+    fabChat.style.display = (scrolled && !chatOpen) ? 'flex' : 'none';
+
+    // FABグループの位置: 広い画面でチャット開いている時は左にずらす
+    if (chatOpen && window.innerWidth >= 1024) {
+      fabGroup.style.right = 'calc(420px + 1.5rem)';
+    } else {
+      fabGroup.style.right = '1.5rem';
+    }
+  }
+
+  window.addEventListener('scroll', updateFabs, {passive: true});
+  // Alpine storeの変更を監視
+  document.addEventListener('alpine:initialized', function() {
+    Alpine.effect(updateFabs);
+  });
 }());
 </script>
 
