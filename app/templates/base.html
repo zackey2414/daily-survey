@@ -22,11 +22,18 @@
         dateStr: '',
         toggle(dateStr) {
           if (this.open) { this.open = false; return; }
+          var needLoad = !this.loaded || this.dateStr !== dateStr;
           this.dateStr = dateStr;
           this.open = true;
-          if (!this.loaded || this.dateStr !== dateStr) {
+          if (needLoad) {
             this.loaded = true;
-            htmx.ajax('GET', '/daily-chat/' + dateStr + '/sessions/latest', {target: '#daily-chat-panel', swap: 'innerHTML'});
+            var url = '/daily-chat/' + dateStr + '/sessions/latest';
+            // 広い画面用パネル
+            var desktop = document.getElementById('daily-chat-panel');
+            if (desktop) htmx.ajax('GET', url, {target: '#daily-chat-panel', swap: 'innerHTML'});
+            // 狭い画面用パネル
+            var mobile = document.getElementById('daily-chat-panel-mobile');
+            if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
           }
         }
       });
@@ -123,18 +130,22 @@
   </div>
 </nav>
 
-<!-- メインコンテンツ -->
-<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-  {% block content %}{% endblock %}
-</main>
-
-<!-- フッター -->
-<footer class="mt-16 py-6 border-t border-slate-200">
-  <div class="text-center space-y-1">
-    <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
-    <p class="text-slate-400 text-xs">毎朝 09:00 JST 自動更新</p>
+<!-- メインコンテンツ + 日毎チャットパネルの横並びレイアウト -->
+<div class="flex min-h-[calc(100vh-52px)]">
+  <div class="flex-1 min-w-0 transition-all duration-300">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {% block content %}{% endblock %}
+    </main>
+    <!-- フッター -->
+    <footer class="mt-16 py-6 border-t border-slate-200">
+      <div class="text-center space-y-1">
+        <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
+        <p class="text-slate-400 text-xs">毎朝 09:00 JST 自動更新</p>
+      </div>
+    </footer>
   </div>
-</footer>
+  {% block daily_chat_panel %}{% endblock %}
+</div>
 
 <!-- セクションスティッキーブロック: 元のトグルボタンをクローンして上部からスライドイン -->
 <script>

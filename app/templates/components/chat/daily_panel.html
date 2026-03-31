@@ -8,48 +8,48 @@
     current_index  : int
     total_sessions : int
 -->
-<div class="bg-white h-full flex flex-col" id="daily-chat-container">
+<div class="bg-blue-50 h-full flex flex-col" id="daily-chat-container">
 
   <!-- チャットヘッダー -->
-  <div class="px-3 py-2 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm shrink-0">
+  <div class="px-3 py-2 bg-blue-600 text-white border-b border-blue-700 flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm shrink-0">
     <div class="flex items-center gap-1 sm:gap-2 min-w-0">
-      <span class="text-gray-500 shrink-0">{{ date_str }} チャット</span>
+      <span class="text-blue-100 shrink-0">{{ date_str }} チャット</span>
 
       {% if current_index > 0 %}
-      <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
+      <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
               hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index - 1].id }}"
               hx-target="#daily-chat-panel"
               hx-swap="innerHTML">
         ‹
       </button>
       {% else %}
-      <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>‹</button>
+      <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 text-blue-300 cursor-not-allowed shrink-0" disabled>‹</button>
       {% endif %}
 
-      <span class="text-gray-700 font-medium truncate max-w-[120px] sm:max-w-48">{{ session.title }}</span>
+      <span class="text-white font-medium truncate max-w-[120px] sm:max-w-48">{{ session.title }}</span>
 
       {% if current_index < total_sessions - 1 %}
-      <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
+      <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
               hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index + 1].id }}"
               hx-target="#daily-chat-panel"
               hx-swap="innerHTML">
         ›
       </button>
       {% else %}
-      <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>›</button>
+      <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 text-blue-300 cursor-not-allowed shrink-0" disabled>›</button>
       {% endif %}
 
-      <span class="text-xs text-gray-400 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
+      <span class="text-xs text-blue-200 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
     </div>
 
     <div class="flex items-center gap-1.5 shrink-0">
-      <button class="flex items-center gap-1 text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-lg hover:bg-emerald-700 transition"
+      <button class="flex items-center gap-1 text-xs bg-white text-blue-700 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition font-medium"
               hx-post="/daily-chat/{{ date_str }}/sessions"
               hx-target="#daily-chat-panel"
               hx-swap="innerHTML">
         + 新規チャット
       </button>
-      <button class="flex items-center gap-1 text-xs bg-white text-red-500 border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition"
+      <button class="flex items-center gap-1 text-xs bg-blue-500 text-blue-100 border border-blue-400 px-2.5 py-1 rounded-lg hover:bg-blue-400 transition"
               hx-delete="/daily-chat/{{ date_str }}/sessions/{{ session.id }}"
               hx-confirm="このチャット「{{ session.title }}」を削除しますか？&#10;この操作は取り消せません。"
               hx-target="#daily-chat-panel"
@@ -73,7 +73,7 @@
   </div>
 
   <!-- 入力フォーム -->
-  <form class="px-4 py-3 border-t bg-gray-50 flex gap-2 items-end shrink-0"
+  <form class="px-4 py-3 border-t border-blue-200 bg-blue-100/50 flex gap-2 items-end shrink-0"
         id="daily-chat-form-{{ session.id }}"
         hx-post="/daily-chat/{{ date_str }}/sessions/{{ session.id }}/messages"
         hx-target="#daily-messages-{{ session.id }}"
