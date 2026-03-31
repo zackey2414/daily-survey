@@ -119,7 +119,7 @@ async def reprocess_summaries(date_str: str | None = None):
             target_date_str = raw.get("date", date_str)
 
         paper_cats = ["cv", "lg", "ai", "cl"]
-        article_cats = ["industry", "industry_news", "community", "python"]
+        article_cats = ["industry", "industry_news", "community", "github_trending"]
         tasks = [summarize_items(data[c], "paper") for c in paper_cats] + [
             summarize_items(data[c], "article") for c in article_cats
         ]
@@ -131,6 +131,72 @@ async def reprocess_summaries(date_str: str | None = None):
 
     asyncio.create_task(_run())
     return {"message": f"{date_str} の再要約を開始しました（バックグラウンド実行）"}
+
+
+def _render_keywords_html(keywords: list[str]) -> str:
+    """キーワード一覧の HTML フラグメントを生成"""
+    tags = []
+    for kw in keywords:
+        tags.append(
+            f'<span class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 '
+            f'ring-1 ring-emerald-200 px-2.5 py-1 rounded-full">'
+            f"{kw}"
+            f'<button hx-delete="/admin/github-trending-keywords/{kw}" '
+            f'hx-target="#gt-keywords-container" hx-swap="innerHTML" '
+            f'class="text-emerald-400 hover:text-red-500 ml-0.5 font-bold">×</button>'
+            f"</span>"
+        )
+    return f'<div class="flex flex-wrap gap-1.5">{"".join(tags)}</div>'
+
+
+@app.get("/admin/github-trending-keywords")
+async def get_github_trending_keywords(request: Request):
+    """GitHub Trending のフィルタキーワード一覧を取得"""
+    from app.services.collector.github_trending import load_keywords
+
+    keywords = load_keywords()
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(_render_keywords_html(keywords))
+    return {"keywords": keywords}
+
+
+@app.post("/admin/github-trending-keywords")
+async def add_github_trending_keyword(request: Request, keyword: str = ""):
+    """GitHub Trending のフィルタキーワードを追加"""
+    from app.services.collector.github_trending import load_keywords, save_keywords
+
+    # HTMX form の場合は form data から取得
+    if "hx-request" in request.headers:
+        form = await request.form()
+        keyword = str(form.get("keyword", keyword))
+    keywords = load_keywords()
+    kw = keyword.strip()
+    if kw and kw not in keywords:
+        keywords.append(kw)
+        save_keywords(keywords)
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(_render_keywords_html(keywords))
+    return {"keywords": keywords}
+
+
+@app.delete("/admin/github-trending-keywords/{keyword}")
+async def delete_github_trending_keyword(request: Request, keyword: str):
+    """GitHub Trending のフィルタキーワードを削除"""
+    from app.services.collector.github_trending import load_keywords, save_keywords
+
+    keywords = load_keywords()
+    kw = keyword.strip()
+    keywords = [k for k in keywords if k != kw]
+    save_keywords(keywords)
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(_render_keywords_html(keywords))
+    return {"keywords": keywords}
 
 
 @app.exception_handler(404)

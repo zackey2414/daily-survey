@@ -72,7 +72,8 @@ everyday-survey/
 │   │       ├── industry.py        # 企業公式ブログ RSS（自社発表）
 │   │       ├── industry_news.py   # 海外大手ニュースサイト RSS（その他報道）
 │   │       ├── community.py       # Qiita API / Zenn RSS / Reddit JSON API
-│   │       └── python_news.py     # PyPI RSS / GitHub Trending スクレイピング
+│   │       ├── python_news.py     # (旧) Python 限定 GitHub Trending（後方互換用）
+│   │       └── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付きスクレイパー
 │   │
 │   ├── db/
 │   │   ├── database.py            # SQLAlchemy async セッション・init_db・migrate_db
@@ -163,7 +164,7 @@ JST 09:00 (APScheduler)
     ├── collect_industry(target_date)        → 企業公式 RSS（自社発表）
     ├── collect_industry_news(target_date)   → 海外ニュース RSS（その他報道）
     ├── collect_community(target_date)       → Qiita / Zenn / Reddit
-    └── collect_python_news(target_date)     → PyPI / GitHub Trending
+    └── collect_github_trending(target_date)  → GitHub Trending（全言語, AI/LLMキーワードフィルタ, 3期間スクレイピング）
     │
     ▼
 ② 重複除去（論文系のみ: cv / openreview / lg / ai / cl）
@@ -232,10 +233,16 @@ JST 09:00 (APScheduler)
 - **Zenn**: RSS フィード → `https://zenn.dev/topics/機械学習/feed`
 - **Reddit**: JSON API → `r/MachineLearning` / `r/artificial` / `r/LocalLLaMA`
 
-### 5.6 Python 情報
+### 5.6 GitHub Trending
 
-- **PyPI**: RSS `https://pypi.org/rss/updates.xml`
-- **GitHub Trending**: HTML スクレイピング（BeautifulSoup）→ Python カテゴリのトレンドリポジトリ
+- **GitHub Trending**: HTML スクレイピング（BeautifulSoup）→ 全言語の AI/LLM 関連トレンドリポジトリ
+  - `https://github.com/trending` を `since=daily`, `weekly`, `monthly` の3期間でスクレイピング
+  - 各期間最大20件取得し、キーワードフィルタ（AI, LLM, agent 等）で絞り込み
+  - 4つのランキング軸: 日次スター増加 / 週次スター増加 / 月次スター増加 / 累計スター
+  - **スマート再収集**: 過去に調査済みのリポジトリは `github_trending_index.json` で追跡
+    - description 変更なし & 30日以内 → 前回のカードを再利用（`reused_from` タグ付与）
+    - description 変更あり or 30日超経過 → 新たに要約を生成
+  - キーワードは `data/github_trending_keywords.json` でカスタマイズ可能（UI からも変更可能）
 
 ---
 
@@ -425,7 +432,7 @@ CREATE TABLE user_tags (
 4. **AI 企業動向**（親セクション）
    - 自社発表 / その他報道（各サブセクション）
 5. **SNS・コミュニティ**（単体セクション: Qiita / Zenn / Reddit）
-6. **Python 情報**（単体セクション: GitHub Trending）
+6. **GitHub Trending**（単体セクション: ソートUI付き — Daily/Weekly/Monthly/Total ★ 切替）
 
 ### 10.2 記事カード（`components/article/card.html`）
 

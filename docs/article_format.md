@@ -103,7 +103,7 @@ pipeline.py では `summarize_items(industry_items, "industry")` として呼び
 
 ## 3. Web記事（RSS / Qiita / Zenn / Reddit）
 
-`category: "article"` のアイテムに適用（コミュニティ記事・Python 情報）。
+`category: "article"` のアイテムに適用（コミュニティ記事・GitHub Trending）。
 
 ```
 【日本語タイトル】
@@ -139,8 +139,9 @@ pipeline.py では `summarize_items(industry_items, "industry")` として呼び
 
 ## 4. GitHub Trending
 
-`source_type: "github_trending"` のアイテムに適用（Python 情報）。
-記事フォーマットと同じプロンプトを使用するが、ポイントは2箇条を目安とする。
+`source_type: "github_trending"` のアイテムに適用（GitHub Trending）。
+全言語の AI/LLM 関連リポジトリを対象。記事フォーマットと同じプロンプトを使用するが、ポイントは2箇条を目安とする。
+ランキング情報（日次/週次/月次スター増加数、累計スター数）は `tags` フィールドに `stars_daily:N` 形式で格納される。
 
 ```
 【日本語タイトル】

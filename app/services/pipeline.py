@@ -20,7 +20,7 @@ from app.services.collector.openreview import collect_openreview
 from app.services.collector.industry import collect_industry
 from app.services.collector.industry_news import collect_industry_news
 from app.services.collector.community import collect_community
-from app.services.collector.python_news import collect_python_news
+from app.services.collector.github_trending import collect_github_trending
 from app.services.summarizer import summarize_items
 from app.services.digest import generate_digest, load_digest
 from app.services.notifier import CollectionReport, send_completion_email
@@ -65,13 +65,13 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_items,
         industry_news_items,
         community_items,
-        python_items,
+        github_trending_items,
     ) = await asyncio.gather(
         collect_openreview(target_date),
         collect_industry(target_date),
         collect_industry_news(target_date),
         collect_community(target_date),
-        collect_python_news(target_date),
+        collect_github_trending(target_date),
         return_exceptions=True,
     )
 
@@ -88,7 +88,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     industry_items = _safe(industry_items, "Industry", [])
     industry_news_items = _safe(industry_news_items, "Industry News", [])
     community_items = _safe(community_items, "Community", [])
-    python_items = _safe(python_items, "Python", [])
+    github_trending_items = _safe(github_trending_items, "GitHub Trending", [])
 
     lg_papers = arxiv_results.get("cs.LG", [])
     ai_papers = arxiv_results.get("cs.AI", [])
@@ -126,7 +126,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_items,
         industry_news_items,
         community_items,
-        python_items,
+        github_trending_items,
     ) = await asyncio.gather(
         summarize_items(cv_arxiv_papers, "paper"),
         summarize_items(openreview_items, "paper"),
@@ -136,7 +136,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         summarize_items(industry_items, "industry"),
         summarize_items(industry_news_items, "industry"),
         summarize_items(community_items, "article"),
-        summarize_items(python_items, "article"),
+        summarize_items(github_trending_items, "article"),
     )
 
     # ── 3. JSON 保存 ────────────────────────────────────────────
@@ -153,7 +153,9 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         collection_date_str, target_date_str, "industry_news", industry_news_items
     )
     _save_collection(collection_date_str, target_date_str, "community", community_items)
-    _save_collection(collection_date_str, target_date_str, "python", python_items)
+    _save_collection(
+        collection_date_str, target_date_str, "github_trending", github_trending_items
+    )
 
     # 収集件数を記録
     report.counts = {
@@ -165,7 +167,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         "企業動向（自社発表）": len(industry_items),
         "企業動向（その他報道）": len(industry_news_items),
         "コミュニティ": len(community_items),
-        "Python 情報": len(python_items),
+        "GitHub Trending": len(github_trending_items),
     }
 
     # DB に記事を登録（チャット機能のため）
@@ -179,7 +181,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_items,
         industry_news_items,
         community_items,
-        python_items,
+        github_trending_items,
     )
 
     # ── 4. ダイジェスト生成 ────────────────────────────────────
@@ -193,7 +195,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
             cl_papers,
             industry_items,
             community_items,
-            python_items,
+            github_trending_items,
             target_date_str=target_date_str,
         )
         digest_content = load_digest(collection_date_str) or ""
@@ -227,6 +229,7 @@ def _save_collection(
         "industry_news",
         "community",
         "python",
+        "github_trending",
     ],
     items: list[ArticleItem],
 ) -> None:
@@ -268,7 +271,7 @@ async def _register_articles_to_db(
         "industry",
         "industry_news",
         "community",
-        "python",
+        "github_trending",
     ]
 
     async with AsyncSessionLocal() as session:
@@ -305,12 +308,15 @@ def load_daily_data(date_str: str) -> dict[str, list[ArticleItem]]:
         "industry",
         "industry_news",
         "community",
-        "python",
+        "github_trending",
     ]
     result: dict[str, list[ArticleItem]] = {}
 
     for cat in categories:
         file_path = settings.data_dir / date_str / f"papers_{cat}.json"
+        # github_trending → python へのフォールバック（旧データ互換）
+        if not file_path.exists() and cat == "github_trending":
+            file_path = settings.data_dir / date_str / "papers_python.json"
         if not file_path.exists():
             result[cat] = []
             continue

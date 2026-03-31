@@ -29,9 +29,9 @@ CATEGORY_META = {
         "is_paper": False,
     },
     "community": {"icon": "🗣️", "title": "SNS・コミュニティ", "is_paper": False},
-    "python": {
-        "icon": "🐍",
-        "title": "Python 情報（GitHub Trending）",
+    "github_trending": {
+        "icon": "🔥",
+        "title": "GitHub Trending",
         "is_paper": False,
     },
 }
@@ -44,7 +44,7 @@ CATEGORY_ORDER = [
     "industry",
     "industry_news",
     "community",
-    "python",
+    "github_trending",
 ]
 
 
