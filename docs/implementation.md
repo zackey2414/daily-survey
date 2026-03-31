@@ -155,9 +155,10 @@ everyday-survey/
 JST 09:00 (APScheduler)
     │
     ▼
-① 並列収集 (asyncio.gather)
-    ├── collect_all_arxiv(target_date)       → cs.LG / cs.AI / cs.CL
-    ├── collect_arxiv_cv(target_date)        → cs.CV（最大40件・優先度付き）
+① 収集
+    [直列] collect_all_arxiv_serial(target_date)
+    │   └── 1クライアントで cs.CV → cs.LG → cs.AI → cs.CL を直列取得（カテゴリ間5秒待機）
+    [並列] asyncio.gather
     ├── collect_openreview(target_date)      → OpenReview（10学会）
     ├── collect_industry(target_date)        → 企業公式 RSS（自社発表）
     ├── collect_industry_news(target_date)   → 海外ニュース RSS（その他報道）

@@ -15,7 +15,7 @@ import pytz
 
 from app.config import settings
 from app.schemas import ArticleItem, DailyCollection
-from app.services.collector.arxiv import collect_all_arxiv, collect_arxiv_cv
+from app.services.collector.arxiv import collect_all_arxiv_serial
 from app.services.collector.openreview import collect_openreview
 from app.services.collector.industry import collect_industry
 from app.services.collector.industry_news import collect_industry_news
@@ -50,17 +50,11 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     # ── 1. 収集 ─────────────────────────────────────────────────
     logger.info("収集開始...")
 
-    # arXiv は順次収集（API レートリミット対策）
+    # arXiv は全カテゴリを1クライアントで直列収集（API レートリミット対策）
     cv_arxiv_papers: list[ArticleItem] = []
-    try:
-        cv_arxiv_papers = await collect_arxiv_cv(target_date)
-    except Exception as e:
-        errors.append(f"arXiv cs.CV: {e}")
-        logger.error(f"arXiv cs.CV 収集失敗: {e}")
-    await asyncio.sleep(3)
     arxiv_results: dict[str, list[ArticleItem]] = {}
     try:
-        arxiv_results = await collect_all_arxiv(target_date)
+        cv_arxiv_papers, arxiv_results = await collect_all_arxiv_serial(target_date)
     except Exception as e:
         errors.append(f"arXiv: {e}")
         logger.error(f"arXiv 収集失敗: {e}")
