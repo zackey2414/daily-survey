@@ -45,6 +45,9 @@ class Settings:
     python_max_results: int = 10  # Python 情報合計上限（後方互換用）
     openreview_max_results: int = 20
 
+    # GitHub API（トークンがあればレートリミット緩和: 60→5000 req/h）
+    github_token: str = os.getenv("GITHUB_TOKEN", "")
+
     # GitHub Trending 設定
     github_trending_max_results: int = 20  # 各期間あたりの取得上限
     github_trending_stale_days: int = 30  # 再収集の閾値（日数）

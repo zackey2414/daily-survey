@@ -3,8 +3,11 @@ GitHub Trending 収集モジュール
 全言語のトレンドリポジトリを daily/weekly/monthly の3期間でスクレイピングし、
 AI/LLM 関連キーワードでフィルタリングして収集する。
 スマート再収集: 過去に調査済みのリポジトリは条件付きで再利用する。
+
+収集は直列で行い、リトライ・待機を十分に設けて確実にデータを取得する。
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -20,9 +23,15 @@ from app.schemas import ArticleItem, DailyCollection
 logger = logging.getLogger(__name__)
 
 GITHUB_TRENDING_URL = "https://github.com/trending"
+GITHUB_API_URL = "https://api.github.com"
 PERIODS = ["daily", "weekly", "monthly"]
 INDEX_FILE = "github_trending_index.json"
 KEYWORDS_FILE = "github_trending_keywords.json"
+
+# ページ間・API間の待機秒数（レートリミット回避）
+_INTER_PAGE_DELAY = 10
+_INTER_API_DELAY = 2
+_MAX_RETRIES = 3
 
 
 # ── 公開 API ──────────────────────────────────────────────────
@@ -36,36 +45,46 @@ async def collect_github_trending(target_date: date | None = None) -> list[Artic
     collection_date = target_date + timedelta(days=1)
     collection_date_str = collection_date.isoformat()
 
-    # 1. 3期間スクレイピング
-    raw_by_period: dict[str, list[_RawRepo]] = {}
-    for period in PERIODS:
-        repos = await _scrape_trending_page(period)
-        raw_by_period[period] = repos
-        logger.info(f"GitHub Trending ({period}): {len(repos)} 件取得")
+    async with httpx.AsyncClient(
+        timeout=60.0,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; AI-Daily-Survey/1.0)"},
+        follow_redirects=True,
+    ) as client:
+        # 1. 3期間スクレイピング（直列・リトライ付き）
+        raw_by_period: dict[str, list[_RawRepo]] = {}
+        for period in PERIODS:
+            repos = await _scrape_trending_page(client, period)
+            raw_by_period[period] = repos
+            logger.info(f"GitHub Trending ({period}): {len(repos)} 件取得")
+            if period != PERIODS[-1]:
+                await asyncio.sleep(_INTER_PAGE_DELAY)
 
-    # 2. キーワードフィルタ
-    keywords = _load_keywords()
-    for period, repos in raw_by_period.items():
-        filtered = _filter_by_keywords(repos, keywords)
-        raw_by_period[period] = filtered
-        logger.info(f"GitHub Trending ({period}): フィルタ後 {len(filtered)} 件")
+        # 2. キーワードフィルタ
+        keywords = _load_keywords()
+        for period, repos in raw_by_period.items():
+            filtered = _filter_by_keywords(repos, keywords)
+            raw_by_period[period] = filtered
+            logger.info(f"GitHub Trending ({period}): フィルタ後 {len(filtered)} 件")
 
-    # 3. 上限適用
-    max_results = settings.github_trending_max_results
-    for period in PERIODS:
-        raw_by_period[period] = raw_by_period[period][:max_results]
+        # 3. 上限適用
+        max_results = settings.github_trending_max_results
+        for period in PERIODS:
+            raw_by_period[period] = raw_by_period[period][:max_results]
 
-    # 4. URL をキーにマージ（重複統合）
-    merged = _merge_periods(raw_by_period)
-    logger.info(f"GitHub Trending: マージ後 {len(merged)} ユニークリポジトリ")
+        # 4. URL をキーにマージ（重複統合）
+        merged = _merge_periods(raw_by_period)
+        logger.info(f"GitHub Trending: マージ後 {len(merged)} ユニークリポジトリ")
 
-    # 5. スマート再収集判定
+        # 5. GitHub API で正確な総スター数を取得（直列・リトライ付き）
+        await _enrich_total_stars(client, merged)
+
+    # 6. スマート再収集判定
     index = _load_index()
     items, resurveyed_urls = _build_items_with_reuse(
         merged, index, target_date, collection_date_str
     )
 
-    # 6. インデックス更新
+    # 7. インデックス更新
     _update_index(index, merged, collection_date_str, resurveyed_urls)
     _save_index(index)
 
@@ -127,21 +146,46 @@ class _MergedRepo:
 # ── スクレイピング ────────────────────────────────────────────
 
 
-async def _scrape_trending_page(period: str) -> list[_RawRepo]:
-    """GitHub Trending の1ページをスクレイピングする"""
-    try:
-        async with httpx.AsyncClient(
-            timeout=30.0,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; AI-Daily-Survey/1.0)"},
-        ) as client:
+async def _scrape_trending_page(
+    client: httpx.AsyncClient, period: str
+) -> list[_RawRepo]:
+    """GitHub Trending の1ページをリトライ付きでスクレイピングする"""
+    for attempt in range(_MAX_RETRIES):
+        try:
             resp = await client.get(
                 GITHUB_TRENDING_URL,
                 params={"since": period},
-                follow_redirects=True,
             )
             resp.raise_for_status()
-    except Exception as e:
-        logger.warning(f"GitHub Trending ({period}) 取得失敗: {e}")
+            break
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if attempt < _MAX_RETRIES - 1 and (status == 429 or status >= 500):
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    wait = int(retry_after) + 5
+                else:
+                    wait = 15 * (2**attempt)
+                logger.warning(
+                    f"GitHub Trending ({period}) HTTP {status}: "
+                    f"{wait}秒後にリトライ ({attempt + 1}/{_MAX_RETRIES})"
+                )
+                await asyncio.sleep(wait)
+                continue
+            logger.error(f"GitHub Trending ({period}) 取得失敗: {e}")
+            return []
+        except httpx.HTTPError as e:
+            if attempt < _MAX_RETRIES - 1:
+                wait = 10 * (2**attempt)
+                logger.warning(
+                    f"GitHub Trending ({period}) エラー: {e} "
+                    f"{wait}秒後にリトライ ({attempt + 1}/{_MAX_RETRIES})"
+                )
+                await asyncio.sleep(wait)
+                continue
+            logger.error(f"GitHub Trending ({period}) 取得失敗: {e}")
+            return []
+    else:
         return []
 
     soup = BeautifulSoup(resp.text, "lxml")
@@ -161,7 +205,7 @@ async def _scrape_trending_page(period: str) -> list[_RawRepo]:
         desc_el = article.select_one("p")
         description = desc_el.get_text(strip=True) if desc_el else ""
 
-        # 総スター数
+        # 総スター数（スクレイピングから暫定取得、後で API で上書き）
         stars_el = article.select_one("a[href$='/stargazers']")
         stars_total = (
             _parse_star_count(stars_el.get_text(strip=True)) if stars_el else 0
@@ -183,7 +227,66 @@ async def _scrape_trending_page(period: str) -> list[_RawRepo]:
             )
         )
 
+    logger.info(f"GitHub Trending ({period}): HTML パース完了 {len(repos)} リポジトリ")
     return repos
+
+
+async def _enrich_total_stars(
+    client: httpx.AsyncClient, merged: list["_MergedRepo"]
+) -> None:
+    """GitHub REST API で各リポジトリの正確な総スター数を取得する
+
+    認証なしの場合は 60 req/h なので、直列 + 待機で確実に取得する。
+    """
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    token = getattr(settings, "github_token", "")
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    success = 0
+    for repo in merged:
+        # URL から owner/name を抽出
+        owner_name = repo.url.replace("https://github.com/", "").strip("/")
+        if "/" not in owner_name:
+            continue
+
+        api_url = f"{GITHUB_API_URL}/repos/{owner_name}"
+        for attempt in range(_MAX_RETRIES):
+            try:
+                resp = await client.get(api_url, headers=headers)
+                if resp.status_code == 403:
+                    # Rate limit — Retry-After or X-RateLimit-Reset
+                    retry_after = resp.headers.get("Retry-After")
+                    if retry_after and retry_after.isdigit():
+                        wait = int(retry_after) + 5
+                    else:
+                        wait = 60  # レートリミット時は60秒待機
+                    logger.warning(
+                        f"GitHub API 403 ({owner_name}): "
+                        f"{wait}秒待機 ({attempt + 1}/{_MAX_RETRIES})"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                if resp.status_code == 200:
+                    data = resp.json()
+                    api_stars = data.get("stargazers_count", 0)
+                    if api_stars > 0:
+                        repo.stars_total = api_stars
+                        success += 1
+                    break
+                # 404 等は諦め（スクレイピングの値を維持）
+                logger.debug(f"GitHub API {resp.status_code} ({owner_name}): スキップ")
+                break
+            except httpx.HTTPError as e:
+                if attempt < _MAX_RETRIES - 1:
+                    await asyncio.sleep(5 * (2**attempt))
+                    continue
+                logger.warning(f"GitHub API エラー ({owner_name}): {e}")
+                break
+
+        await asyncio.sleep(_INTER_API_DELAY)
+
+    logger.info(f"GitHub API 総スター取得: {success}/{len(merged)} 件成功")
 
 
 def _parse_star_count(text: str) -> int:
