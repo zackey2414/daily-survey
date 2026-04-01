@@ -42,8 +42,45 @@ class Settings:
     arxiv_max_results: int = 20
     industry_max_per_company: int = 5
     community_max_results: int = 20  # SNS 全ソース合計上限
-    python_max_results: int = 10  # Python 情報合計上限
+    python_max_results: int = 10  # Python 情報合計上限（後方互換用）
     openreview_max_results: int = 20
+
+    # GitHub API（トークンがあればレートリミット緩和: 60→5000 req/h）
+    github_token: str = os.getenv("GITHUB_TOKEN", "")
+
+    # GitHub Trending 設定
+    github_trending_max_results: int = 20  # 各期間あたりの取得上限
+    github_trending_stale_days: int = 30  # 再収集の閾値（日数）
+    github_trending_keywords: list[str] = [
+        "AI",
+        "LLM",
+        "ML",
+        "deep learning",
+        "machine learning",
+        "GPT",
+        "transformer",
+        "neural",
+        "NLP",
+        "agent",
+        "RAG",
+        "diffusion",
+        "fine-tuning",
+        "fine tuning",
+        "inference",
+        "embedding",
+        "langchain",
+        "llama",
+        "mistral",
+        "ollama",
+        "vector",
+        "chatbot",
+        "generative",
+        "multimodal",
+        "vision",
+        "reinforcement learning",
+        "computer vision",
+        "stable diffusion",
+    ]
 
     # 企業ブログ RSS
     industry_rss_feeds: dict[str, str] = {

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.db.models import UserTag
 from app.jinja import templates
+from app.schemas import ArticleItem
 from app.services.pipeline import load_daily_data, list_available_dates
 from app.services.digest import load_digest, inject_citations
 
@@ -45,7 +46,7 @@ async def archive_day(
         "industry",
         "industry_news",
         "community",
-        "python",
+        "github_trending",
     ]:
         all_items.extend(data.get(key, []))
 
@@ -75,6 +76,13 @@ async def archive_day(
 
     available_dates = list_available_dates()
 
+    # GitHub Trending のソート済みリスト生成
+    gt_items = data.get("github_trending", [])
+    gt_by_daily = _sort_gt_items(gt_items, "stars_daily")
+    gt_by_weekly = _sort_gt_items(gt_items, "stars_weekly")
+    gt_by_monthly = _sort_gt_items(gt_items, "stars_monthly")
+    gt_by_total = _sort_gt_items(gt_items, "stars_total")
+
     return templates.TemplateResponse(
         "pages/index.html",
         {
@@ -91,8 +99,40 @@ async def archive_day(
             "industry_items": data.get("industry", []),
             "industry_news_items": data.get("industry_news", []),
             "community_items": data.get("community", []),
-            "python_items": data.get("python", []),
+            "python_items": [],
+            "github_trending_items": gt_items,
+            "github_trending_by_daily": gt_by_daily,
+            "github_trending_by_weekly": gt_by_weekly,
+            "github_trending_by_monthly": gt_by_monthly,
+            "github_trending_by_total": gt_by_total,
             "available_dates": available_dates,
             "user_tags_by_id": user_tags_by_id,
         },
     )
+
+
+def _extract_star_tag(item: ArticleItem, prefix: str) -> int:
+    """tags から 'stars_daily:1234' 形式の数値を抽出"""
+    for tag in item.tags:
+        if tag.startswith(prefix + ":"):
+            try:
+                return int(tag[len(prefix) + 1 :])
+            except ValueError:
+                pass
+    return 0
+
+
+def _sort_gt_items(
+    items: list[ArticleItem], key: str, *, filter_ranking: bool = True
+) -> list[ArticleItem]:
+    """GitHub Trending アイテムを指定のスター数キーで降順ソート
+
+    filter_ranking=True の場合、対応する ranking:* タグを持つアイテムのみ返す。
+    例: key="stars_daily" → ranking:daily タグがあるアイテムのみ。
+    """
+    if filter_ranking:
+        # stars_daily → daily, stars_weekly → weekly, etc.
+        period = key.replace("stars_", "")
+        ranking_tag = f"ranking:{period}"
+        items = [it for it in items if ranking_tag in it.tags]
+    return sorted(items, key=lambda it: _extract_star_tag(it, key), reverse=True)

@@ -206,18 +206,12 @@
 {% include "components/article/section.html" %}
 {% endif %}
 
-<!-- ⑥ Python 情報 -->
-{% if python_items %}
-{% set section_id = "python" %}
-{% set section_icon = "🐍" %}
-{% set section_title = "Python 情報（GitHub Trending）" %}
-{% set items = python_items %}
-{% set is_paper = false %}
-{% set subsection = false %}
-{% include "components/article/section.html" %}
+<!-- ⑥ GitHub Trending -->
+{% if github_trending_items %}
+{% include "components/article/github_trending_section.html" %}
 {% endif %}
 
-{% if not (cv_papers or openreview_papers or lg_papers or ai_papers or cl_papers or industry_items or industry_news_items or community_items or python_items) %}
+{% if not (cv_papers or openreview_papers or lg_papers or ai_papers or cl_papers or industry_items or industry_news_items or community_items or github_trending_items) %}
 <div class="text-center py-20 text-gray-400">
   <p class="text-5xl mb-4">📭</p>
   <p class="text-lg font-medium text-slate-500">{{ date_str }} のデータがまだありません</p>

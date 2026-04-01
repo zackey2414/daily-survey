@@ -57,6 +57,7 @@ class DailyCollection(BaseModel):
         "industry_news",
         "community",
         "python",
+        "github_trending",
     ]
     collected_at: str  # ISO 8601 収集実行日時 (JST)
     total: int = 0

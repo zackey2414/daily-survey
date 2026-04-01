@@ -33,7 +33,8 @@ app/
 │       ├── industry.py      # AI 企業公式ブログ RSS
 │       ├── industry_news.py # 海外ニュースメディア RSS + キーワードフィルタ
 │       ├── community.py     # Qiita API / Zenn RSS / Reddit JSON API
-│       └── python_news.py   # PyPI RSS / GitHub Trending スクレイピング
+│       ├── python_news.py   # (旧) Python 限定 GitHub Trending（後方互換用）
+│       └── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付き収集
 └── templates/
     ├── base.html        # 共通レイアウト (Tailwind CDN, HTMX, Alpine.js)
     ├── pages/           # フルページテンプレート
@@ -65,6 +66,7 @@ app/
 | `GEMINI_SUMMARY_MODEL` | `gemini-2.5-pro` | ダイジェスト生成用モデル |
 | `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | チャット・個別要約用モデル |
 | `GEMINI_SEARCH_THRESHOLD` | `0.3` | チャット時の Google Search グラウンディング閾値 (0.0=常に検索, 1.0=検索しない) |
+| `GITHUB_TOKEN` | (空) | GitHub API トークン（任意）。設定するとレートリミット 60→5000 req/h に緩和 |
 | `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `9` / `0` | 日次パイプライン実行時刻 (JST) |
 
 ### `db/models.py`

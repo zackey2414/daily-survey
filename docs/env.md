@@ -52,6 +52,12 @@ cp .env.example .env
 | `SMTP_FROM` | `your_email@gmail.com` | **必須** | 通知メールの送信元アドレス。通常は `SMTP_USERNAME` と同じ値にする |
 | `SMTP_TO` | `your_email@gmail.com` | **必須** | 通知メールの送信先アドレス。自分のメールアドレスを設定する |
 
+### GitHub API
+
+| 変数名 | デフォルト | 変更必要度 | 説明 |
+|--------|-----------|-----------|------|
+| `GITHUB_TOKEN` | (空) | 任意 | GitHub Personal Access Token。設定すると GitHub REST API のレートリミットが 60→5000 req/h に緩和される。GitHub Trending 収集時に各リポジトリの正確な総スター数を取得するために使用。[Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens) で発行する（スコープ不要、public repo の読み取りのみ） |
+
 ### スケジューラ
 
 | 変数名 | デフォルト | 変更必要度 | 説明 |

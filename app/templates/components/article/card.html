@@ -39,6 +39,33 @@
           {{ item.source_name or item.source_type }}
         </span>
 
+        <!-- GitHub Trending ランキング・スター情報 -->
+        {% if item.source_type == 'github_trending' %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1.5">
+          {% if gt_rank is defined and gt_rank %}
+          <span class="text-xs font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-0.5 rounded-full">#{{ gt_rank }}</span>
+          {% endif %}
+          {# gt_period が渡された場合はその期間のスター数のみ主表示 + 総スター補助表示 #}
+          {% set period = gt_period if gt_period is defined else "" %}
+          {% for tag in item.tags %}
+            {% if period == "daily" and tag.startswith('stars_daily:') and tag != 'stars_daily:0' %}
+            <span class="text-[11px] font-medium text-gray-600">★ {{ tag.split(':')[1] }} <span class="text-gray-400">today</span></span>
+            {% elif period == "weekly" and tag.startswith('stars_weekly:') and tag != 'stars_weekly:0' %}
+            <span class="text-[11px] font-medium text-gray-600">★ {{ tag.split(':')[1] }} <span class="text-gray-400">/ week</span></span>
+            {% elif period == "monthly" and tag.startswith('stars_monthly:') and tag != 'stars_monthly:0' %}
+            <span class="text-[11px] font-medium text-gray-600">★ {{ tag.split(':')[1] }} <span class="text-gray-400">/ month</span></span>
+            {% elif tag.startswith('stars_total:') and tag != 'stars_total:0' %}
+            <span class="text-[11px] text-gray-500">★ {{ tag.split(':')[1] }} <span class="text-gray-400">total</span></span>
+            {% endif %}
+          {% endfor %}
+          {% for tag in item.tags %}
+            {% if tag.startswith('reused_from:') %}
+            <span class="text-[10px] text-gray-400 italic">初回調査: {{ tag.split(':')[1] }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
         <!-- タイトル -->
         <h3 class="font-semibold leading-snug">
           {% if item.title_ja and item.title_ja != item.title_en %}

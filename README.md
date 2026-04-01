@@ -25,9 +25,9 @@
 | Qiita | AI・機械学習・LLM 関連記事 | REST API |
 | Zenn | AI・機械学習・LLM 関連記事 | RSS フィード |
 | Reddit | r/MachineLearning / r/artificial / r/LocalLLaMA | JSON API |
-| Python 情報 | GitHub Trending (Python) | Web スクレイピング |
+| GitHub Trending | 全言語の AI/LLM 関連トレンドリポジトリ（4軸ランキング） | Web スクレイピング + GitHub REST API |
 
-> GitHub Trending は `github.com/trending/python?since=daily` を BeautifulSoup でパースし、リポジトリ名・説明・スター数を抽出しています。
+> GitHub Trending の詳細は [docs/github_trending.md](docs/github_trending.md) を参照してください。
 
 ---
 
@@ -206,4 +206,5 @@ curl -X POST http://localhost:8000/admin/run-pipeline
 - `docs/env.md` — 環境変数の設定ガイド（`.env` の全項目解説）
 - `docs/implementation.md` — 実装詳細・システムワークフロー
 - `docs/article_format.md` — 記事フォーマット定義
+- `docs/github_trending.md` — GitHub Trending 収集機能の詳細・設定ガイド
 - `docs/requirements.md` — 要件定義書
