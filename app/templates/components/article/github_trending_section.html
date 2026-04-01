@@ -105,6 +105,7 @@
     <!-- Daily ★ ランキング -->
     <div x-show="sort==='daily'" x-cloak>
       {% set is_paper = false %}
+      {% set gt_period = "daily" %}
       {% for item in github_trending_by_daily %}
       {% set gt_rank = loop.index %}
       {% include "components/article/card.html" %}
@@ -117,6 +118,7 @@
     <!-- Weekly ★ ランキング -->
     <div x-show="sort==='weekly'" x-cloak>
       {% set is_paper = false %}
+      {% set gt_period = "weekly" %}
       {% for item in github_trending_by_weekly %}
       {% set gt_rank = loop.index %}
       {% include "components/article/card.html" %}
@@ -129,6 +131,7 @@
     <!-- Monthly ★ ランキング -->
     <div x-show="sort==='monthly'" x-cloak>
       {% set is_paper = false %}
+      {% set gt_period = "monthly" %}
       {% for item in github_trending_by_monthly %}
       {% set gt_rank = loop.index %}
       {% include "components/article/card.html" %}
@@ -141,6 +144,7 @@
     <!-- Total ★ ランキング -->
     <div x-show="sort==='total'" x-cloak>
       {% set is_paper = false %}
+      {% set gt_period = "total" %}
       {% for item in github_trending_by_total %}
       {% set gt_rank = loop.index %}
       {% include "components/article/card.html" %}

@@ -235,14 +235,17 @@ JST 09:00 (APScheduler)
 
 ### 5.6 GitHub Trending
 
-- **GitHub Trending**: HTML スクレイピング（BeautifulSoup）→ 全言語の AI/LLM 関連トレンドリポジトリ
-  - `https://github.com/trending` を `since=daily`, `weekly`, `monthly` の3期間でスクレイピング
+- **GitHub Trending**: HTML スクレイピング（BeautifulSoup）+ GitHub REST API → 全言語の AI/LLM 関連トレンドリポジトリ
+  - `https://github.com/trending` を `since=daily`, `weekly`, `monthly` の3期間で**直列スクレイピング**（ページ間10秒待機）
+  - 各ページ取得は最大3回リトライ（429/5xx 時は指数バックオフ + `Retry-After` 対応）
   - 各期間最大20件取得し、キーワードフィルタ（AI, LLM, agent 等）で絞り込み
-  - 4つのランキング軸: 日次スター増加 / 週次スター増加 / 月次スター増加 / 累計スター
+  - 4つの独立したランキングビュー: Daily ★ / Weekly ★ / Monthly ★ / Total ★
+  - **GitHub REST API** で全リポジトリの正確な累計スター数を取得（`GITHUB_TOKEN` 設定でレートリミット緩和可能）
   - **スマート再収集**: 過去に調査済みのリポジトリは `github_trending_index.json` で追跡
     - description 変更なし & 30日以内 → 前回のカードを再利用（`reused_from` タグ付与）
     - description 変更あり or 30日超経過 → 新たに要約を生成
   - キーワードは `data/github_trending_keywords.json` でカスタマイズ可能（UI からも変更可能）
+  - 詳細は [docs/github_trending.md](github_trending.md) を参照
 
 ---
 
