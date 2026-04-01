@@ -46,13 +46,13 @@
           <span class="text-xs font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-0.5 rounded-full">#{{ gt_rank }}</span>
           {% endif %}
           {% for tag in item.tags %}
-            {% if tag.startswith('stars_daily:') %}
+            {% if tag.startswith('stars_daily:') and tag != 'stars_daily:0' %}
             <span class="text-[11px] text-gray-500">★ {{ tag.split(':')[1] }} <span class="text-gray-400">today</span></span>
-            {% elif tag.startswith('stars_weekly:') %}
+            {% elif tag.startswith('stars_weekly:') and tag != 'stars_weekly:0' %}
             <span class="text-[11px] text-gray-500">★ {{ tag.split(':')[1] }} <span class="text-gray-400">/ week</span></span>
-            {% elif tag.startswith('stars_monthly:') %}
+            {% elif tag.startswith('stars_monthly:') and tag != 'stars_monthly:0' %}
             <span class="text-[11px] text-gray-500">★ {{ tag.split(':')[1] }} <span class="text-gray-400">/ month</span></span>
-            {% elif tag.startswith('stars_total:') %}
+            {% elif tag.startswith('stars_total:') and tag != 'stars_total:0' %}
             <span class="text-[11px] text-gray-500">★ {{ tag.split(':')[1] }} <span class="text-gray-400">total</span></span>
             {% endif %}
           {% endfor %}

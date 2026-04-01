@@ -122,6 +122,17 @@ def _extract_star_tag(item: ArticleItem, prefix: str) -> int:
     return 0
 
 
-def _sort_gt_items(items: list[ArticleItem], key: str) -> list[ArticleItem]:
-    """GitHub Trending アイテムを指定のスター数キーで降順ソート"""
+def _sort_gt_items(
+    items: list[ArticleItem], key: str, *, filter_ranking: bool = True
+) -> list[ArticleItem]:
+    """GitHub Trending アイテムを指定のスター数キーで降順ソート
+
+    filter_ranking=True の場合、対応する ranking:* タグを持つアイテムのみ返す。
+    例: key="stars_daily" → ranking:daily タグがあるアイテムのみ。
+    """
+    if filter_ranking:
+        # stars_daily → daily, stars_weekly → weekly, etc.
+        period = key.replace("stars_", "")
+        ranking_tag = f"ranking:{period}"
+        items = [it for it in items if ranking_tag in it.tags]
     return sorted(items, key=lambda it: _extract_star_tag(it, key), reverse=True)
