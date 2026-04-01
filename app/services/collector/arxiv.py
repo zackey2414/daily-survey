@@ -84,7 +84,12 @@ async def collect_arxiv(
                 status = e.response.status_code
                 retryable = status == 429 or status >= 500
                 if attempt < max_retries - 1 and retryable:
-                    wait = 10 * (2**attempt)  # 10s, 20s, 40s, 80s
+                    # Retry-After ヘッダがあればそれを尊重、なければ指数バックオフ
+                    retry_after = e.response.headers.get("Retry-After")
+                    if retry_after and retry_after.isdigit():
+                        wait = int(retry_after) + 5  # 余裕を持たせる
+                    else:
+                        wait = 15 * (2**attempt)  # 15s, 30s, 60s, 120s
                     logger.warning(
                         f"arXiv API {status} ({category}): "
                         f"{wait}秒後にリトライ (試行 {attempt + 1}/{max_retries})"
@@ -230,7 +235,7 @@ async def collect_arxiv_cv(
 
 
 # カテゴリ間の待機秒数（arXiv API のレートリミットを避けるため余裕を持たせる）
-_INTER_CATEGORY_DELAY = 5
+_INTER_CATEGORY_DELAY = 15
 
 
 async def collect_all_arxiv_serial(

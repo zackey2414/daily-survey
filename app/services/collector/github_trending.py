@@ -187,15 +187,22 @@ async def _scrape_trending_page(period: str) -> list[_RawRepo]:
 
 
 def _parse_star_count(text: str) -> int:
-    """'1,234' や '1.2k stars today' → 整数に変換"""
-    text = text.lower().replace(",", "").strip()
-    # 数値部分だけ抽出
-    m = re.match(r"([\d.]+)\s*k?", text)
+    """'1,234' や '1.2k stars today' → 整数に変換
+
+    数値直後の k/m のみを倍率として認識する。
+    "18021 stars this week" の "k"（weekの一部）に誤反応しない。
+    """
+    # 数値 + 直後の k/m を正確にキャプチャ
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*([km])?(?:\s|$)", text.lower())
     if not m:
         return 0
-    num = float(m.group(1))
-    if "k" in text:
+    num_str = m.group(1).replace(",", "")
+    suffix = m.group(2)
+    num = float(num_str)
+    if suffix == "k":
         return int(num * 1000)
+    if suffix == "m":
+        return int(num * 1_000_000)
     return int(num)
 
 
