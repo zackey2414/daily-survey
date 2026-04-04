@@ -2,6 +2,15 @@
 {% block title %}{{ date_str }} — AI Daily Survey{% endblock %}
 
 {% block content %}
+<!-- ページ日付データ（FABボタン等で使用） -->
+<div data-page-date="{{ date_str }}" style="display:none"></div>
+<!-- Alpine store に dateStr を初期設定 -->
+<script>
+document.addEventListener('alpine:initialized', function() {
+  var store = Alpine.store('dailyChat');
+  if (store && !store.dateStr) store.dateStr = '{{ date_str }}';
+});
+</script>
 <!-- ページヘッダー -->
 <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-3">
   <div>

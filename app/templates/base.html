@@ -36,14 +36,23 @@
           this._updateBodyScroll(true);
           if (needLoad) {
             this.loaded = true;
-            var url = '/daily-chat/' + dateStr + '/sessions/latest';
-            // 広い画面用パネル
-            var desktop = document.getElementById('daily-chat-panel');
-            if (desktop) htmx.ajax('GET', url, {target: '#daily-chat-panel', swap: 'innerHTML'});
-            // 狭い画面用パネル
-            var mobile = document.getElementById('daily-chat-panel-mobile');
-            if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
+            this._loadPanel(dateStr);
           }
+        },
+        _currentTarget: '',
+        _loadPanel(dateStr) {
+          var url = '/daily-chat/' + dateStr + '/sessions/latest';
+          // 画面幅に応じて片方のパネルのみにロード（重複IDによるHTMX swap誤動作を防止）
+          var isDesktop = window.innerWidth >= 1024;
+          var targetId = isDesktop ? '#daily-chat-panel' : '#daily-chat-panel-mobile';
+          var otherTarget = isDesktop ? document.getElementById('daily-chat-panel-mobile') : document.getElementById('daily-chat-panel');
+          // 以前ロードした側と異なる場合、古い方をクリアしてリロード
+          if (this._currentTarget && this._currentTarget !== targetId) {
+            if (otherTarget) otherTarget.innerHTML = '';
+          }
+          this._currentTarget = targetId;
+          var el = document.querySelector(targetId);
+          if (el) htmx.ajax('GET', url, {target: targetId, swap: 'innerHTML'});
         }
       });
 
@@ -52,10 +61,19 @@
         var store = Alpine.store('dailyChat');
         if (store) store._updateBodyScroll(store.open);
       });
-      // リサイズ時にもスクロールロック状態を再評価
+      // リサイズ時にスクロールロック状態を再評価し、必要に応じてパネルを再ロード
       window.addEventListener('resize', () => {
         var store = Alpine.store('dailyChat');
-        if (store) store._updateBodyScroll(store.open);
+        if (!store) return;
+        store._updateBodyScroll(store.open);
+        // 画面幅が変わりパネル切り替えが必要な場合、適切な側にリロード
+        if (store.open && store.loaded && store.dateStr) {
+          var isDesktop = window.innerWidth >= 1024;
+          var expectedTarget = isDesktop ? '#daily-chat-panel' : '#daily-chat-panel-mobile';
+          if (store._currentTarget !== expectedTarget) {
+            store._loadPanel(store.dateStr);
+          }
+        }
       });
     });
   </script>
@@ -524,8 +542,14 @@
   // チャットFABクリック: Alpine store のtoggleを呼ぶ
   fabChat.addEventListener('click', function() {
     if (window.Alpine && Alpine.store('dailyChat')) {
-      var dateStr = Alpine.store('dailyChat').dateStr;
-      if (dateStr) Alpine.store('dailyChat').toggle(dateStr);
+      var store = Alpine.store('dailyChat');
+      var dateStr = store.dateStr;
+      // dateStr が未設定の場合、ページの date_str を取得（data属性から）
+      if (!dateStr) {
+        var dateEl = document.querySelector('[data-page-date]');
+        if (dateEl) dateStr = dateEl.getAttribute('data-page-date');
+      }
+      if (dateStr) store.toggle(dateStr);
     }
   });
 
