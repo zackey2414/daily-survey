@@ -1,8 +1,11 @@
 """
 アーカイブページルーター（過去日付の記事表示）
+日付を超えた直後でもページを表示し、データがなければ案内メッセージを出す。
 """
 
 import markdown as md
+import pytz
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
@@ -16,6 +19,7 @@ from app.services.pipeline import load_daily_data, list_available_dates
 from app.services.digest import load_digest, inject_citations
 
 router = APIRouter(prefix="/archive")
+JST = pytz.timezone("Asia/Tokyo")
 
 
 @router.get("/{date_str}", response_class=HTMLResponse)
@@ -24,13 +28,14 @@ async def archive_day(
 ):
     # 日付フォーマット検証
     try:
-        from datetime import date, timedelta
-
         collection_date = date.fromisoformat(date_str)
     except ValueError:
         raise HTTPException(
             status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
         )
+
+    today = datetime.now(JST).date()
+    is_today = collection_date == today
 
     target_date_str = (collection_date - timedelta(days=1)).isoformat()
     data = load_daily_data(date_str)
@@ -75,6 +80,13 @@ async def archive_day(
         digest_html = None
 
     available_dates = list_available_dates()
+    # 今日の日付がリストになければ先頭に追加（日付変更直後でデータ未収集の場合）
+    today_str = today.isoformat()
+    if today_str not in available_dates:
+        available_dates = [today_str] + available_dates
+
+    # データが存在するかのフラグ
+    has_data = bool(all_items)
 
     # GitHub Trending のソート済みリスト生成
     gt_items = data.get("github_trending", [])
@@ -89,7 +101,8 @@ async def archive_day(
             "request": request,
             "date_str": date_str,
             "target_date_str": target_date_str,
-            "is_today": False,
+            "is_today": is_today,
+            "has_data": has_data,
             "digest_html": digest_html,
             "cv_papers": data.get("cv", []),
             "openreview_papers": data.get("openreview", []),

@@ -1,6 +1,7 @@
 """
 メインページ（今日の一面）ルーター
-ホームは最新の収集日のアーカイブページへリダイレクトする
+ホームは今日の日付のアーカイブページへリダイレクトする。
+日本時間で日付が変わったら今日のページを表示し、データがなければ「まだ記事はありません」を表示。
 """
 
 from datetime import datetime
@@ -8,8 +9,6 @@ from datetime import datetime
 import pytz
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
-
-from app.services.pipeline import list_available_dates
 
 JST = pytz.timezone("Asia/Tokyo")
 
@@ -19,16 +18,8 @@ router = APIRouter()
 @router.get("/")
 @router.get("/today")
 async def today(request: Request):
-    available = list_available_dates()
     today_str = datetime.now(JST).date().isoformat()
-    # 今日のデータがあればそこへ、なければ最新のデータへ
-    if today_str in available:
-        redirect_date = today_str
-    elif available:
-        redirect_date = available[0]
-    else:
-        redirect_date = today_str
-    return RedirectResponse(url=f"/archive/{redirect_date}")
+    return RedirectResponse(url=f"/archive/{today_str}")
 
 
 @router.get("/health")
