@@ -59,36 +59,47 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         errors.append(f"arXiv: {e}")
         logger.error(f"arXiv 収集失敗: {e}")
 
-    # 他ソースは並列収集
-    (
-        openreview_items,
-        industry_items,
-        industry_news_items,
-        community_items,
-        github_trending_items,
-    ) = await asyncio.gather(
-        collect_openreview(target_date),
-        collect_industry(target_date),
-        collect_industry_news(target_date),
-        collect_community(target_date),
-        collect_github_trending(target_date),
-        return_exceptions=True,
-    )
+    # 他ソースも直列収集（並列実行によるレートリミット・リソース競合を回避）
+    _INTER_SOURCE_DELAY = 3  # ソース間の待機秒数
 
-    # 例外処理
-    def _safe(result, name: str, default):
-        if isinstance(result, Exception):
-            errors.append(f"{name}: {result}")
-            logger.error(f"{name} 収集失敗: {result}")
-            return default
-        return result
+    openreview_items: list[ArticleItem] = []
+    try:
+        openreview_items = await collect_openreview(target_date)
+    except Exception as e:
+        errors.append(f"OpenReview: {e}")
+        logger.error(f"OpenReview 収集失敗: {e}")
+    await asyncio.sleep(_INTER_SOURCE_DELAY)
 
-    # arXiv は上で個別にエラーハンドリング済み
-    openreview_items = _safe(openreview_items, "OpenReview", [])
-    industry_items = _safe(industry_items, "Industry", [])
-    industry_news_items = _safe(industry_news_items, "Industry News", [])
-    community_items = _safe(community_items, "Community", [])
-    github_trending_items = _safe(github_trending_items, "GitHub Trending", [])
+    industry_items: list[ArticleItem] = []
+    try:
+        industry_items = await collect_industry(target_date)
+    except Exception as e:
+        errors.append(f"Industry: {e}")
+        logger.error(f"Industry 収集失敗: {e}")
+    await asyncio.sleep(_INTER_SOURCE_DELAY)
+
+    industry_news_items: list[ArticleItem] = []
+    try:
+        industry_news_items = await collect_industry_news(target_date)
+    except Exception as e:
+        errors.append(f"Industry News: {e}")
+        logger.error(f"Industry News 収集失敗: {e}")
+    await asyncio.sleep(_INTER_SOURCE_DELAY)
+
+    community_items: list[ArticleItem] = []
+    try:
+        community_items = await collect_community(target_date)
+    except Exception as e:
+        errors.append(f"Community: {e}")
+        logger.error(f"Community 収集失敗: {e}")
+    await asyncio.sleep(_INTER_SOURCE_DELAY)
+
+    github_trending_items: list[ArticleItem] = []
+    try:
+        github_trending_items = await collect_github_trending(target_date)
+    except Exception as e:
+        errors.append(f"GitHub Trending: {e}")
+        logger.error(f"GitHub Trending 収集失敗: {e}")
 
     lg_papers = arxiv_results.get("cs.LG", [])
     ai_papers = arxiv_results.get("cs.AI", [])
