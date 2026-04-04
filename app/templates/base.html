@@ -13,6 +13,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <!-- marked.js (Markdown レンダリング) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <!-- Alpine.js -->
   <script>
     document.addEventListener('alpine:init', () => {
@@ -91,6 +93,18 @@
     .prose a:hover { text-decoration-color: #2563eb; }
     .prose code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: #475569; }
     .prose blockquote { border-left: 3px solid #c7d2fe; padding-left: 1rem; color: #6b7280; margin: 0.75rem 0; font-style: italic; }
+
+    /* チャットマークダウン（AI応答内の prose 微調整） */
+    .chat-markdown .prose { margin: 0; }
+    .chat-markdown .prose p { margin-bottom: 0.4rem; }
+    .chat-markdown .prose p:last-child { margin-bottom: 0; }
+    .chat-markdown .prose h1,
+    .chat-markdown .prose h2,
+    .chat-markdown .prose h3 { margin-top: 0.6rem; }
+    .chat-markdown .prose ul,
+    .chat-markdown .prose ol { margin: 0.3rem 0; }
+    .chat-markdown .prose pre { background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.5rem 0; font-size: 0.8em; }
+    .chat-markdown .prose pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
 
     /* チャット（記事カード内埋め込み用） */
     .card .chat-messages { max-height: 400px; overflow-y: auto; }

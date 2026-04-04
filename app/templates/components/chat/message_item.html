@@ -10,16 +10,36 @@
       {% else %}
         bg-gray-100 text-gray-800
       {% endif %}">
-      {% if msg.role == 'assistant' and msg.used_search %}
-        {% set sources = msg.search_sources_parsed %}
-        {% set ns = namespace(content=msg.content | replace('\n', '<br>')) %}
-        {% for src in sources %}
-          {% set idx = loop.index %}
-          {% set badge = '[' ~ idx ~ ']' %}
-          {% set link = '<a href="' ~ src.uri ~ '" target="_blank" rel="noopener" class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-blue-600 bg-blue-100 rounded hover:bg-blue-200 no-underline align-super leading-none" title="' ~ (src.title or src.uri) ~ '">' ~ idx ~ '</a>' %}
-          {% set ns.content = ns.content | replace(badge, link) %}
-        {% endfor %}
-        {{ ns.content | safe }}
+      {% if msg.role == 'assistant' %}
+        {% if msg.used_search %}
+          {% set sources = msg.search_sources_parsed %}
+          {# マークダウンレンダリング後に引用バッジを挿入 #}
+          <div class="prose prose-sm chat-markdown"
+               x-data x-init="
+                 var raw = $el.querySelector('.md-raw').textContent;
+                 var html = (typeof marked !== 'undefined') ? marked.parse(raw) : raw.replace(/\n/g, '<br>');
+                 {% for src in sources %}
+                   {% set idx = loop.index %}
+                   {% set badge = '[' ~ idx ~ ']' %}
+                   html = html.split('{{ badge }}').join('<a href=&quot;{{ src.uri }}&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; class=&quot;inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-blue-600 bg-blue-100 rounded hover:bg-blue-200 no-underline align-super leading-none&quot; title=&quot;{{ (src.title or src.uri) | e }}&quot;>{{ idx }}</a>');
+                 {% endfor %}
+                 $el.querySelector('.md-render').innerHTML = html;
+               ">
+            <script type="text/plain" class="md-raw" style="display:none">{{ msg.content }}</script>
+            <div class="md-render"></div>
+          </div>
+        {% else %}
+          {# 検索なしのAI応答: マークダウンレンダリングのみ #}
+          <div class="prose prose-sm chat-markdown"
+               x-data x-init="
+                 var raw = $el.querySelector('.md-raw').textContent;
+                 var html = (typeof marked !== 'undefined') ? marked.parse(raw) : raw.replace(/\n/g, '<br>');
+                 $el.querySelector('.md-render').innerHTML = html;
+               ">
+            <script type="text/plain" class="md-raw" style="display:none">{{ msg.content }}</script>
+            <div class="md-render"></div>
+          </div>
+        {% endif %}
       {% else %}
         {{ msg.content | replace('\n', '<br>') | safe }}
       {% endif %}
