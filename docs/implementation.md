@@ -159,7 +159,7 @@ JST 09:00 (APScheduler)
 ① 収集
     [直列] collect_all_arxiv_serial(target_date)
     │   └── 1クライアントで cs.CV → cs.LG → cs.AI → cs.CL を直列取得（カテゴリ間5秒待機）
-    [並列] asyncio.gather
+    [直列] 各ソースを順次収集（ソース間3秒待機）
     ├── collect_openreview(target_date)      → OpenReview（10学会）
     ├── collect_industry(target_date)        → 企業公式 RSS（自社発表）
     ├── collect_industry_news(target_date)   → 海外ニュース RSS（その他報道）
