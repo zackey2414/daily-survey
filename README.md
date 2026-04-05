@@ -25,7 +25,7 @@
 | Qiita | AI・機械学習・LLM 関連記事 | REST API |
 | Zenn | AI・機械学習・LLM 関連記事 | RSS フィード |
 | Reddit | r/MachineLearning / r/artificial / r/LocalLLaMA | JSON API |
-| GitHub Trending | 全言語の AI/LLM 関連トレンドリポジトリ（4軸ランキング） | Web スクレイピング + GitHub REST API |
+| GitHub Trending | 全言語の AI/LLM 関連トレンドリポジトリ（4軸ランキング、各10件） | Web スクレイピング + GitHub REST API |
 
 > GitHub Trending の詳細は [docs/github_trending.md](docs/github_trending.md) を参照してください。
 
@@ -36,7 +36,7 @@
 | レイヤー | 技術 |
 |----------|------|
 | Backend | Python 3.12 + FastAPI |
-| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS (CDN) |
+| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS + marked.js (すべて CDN) |
 | DB | SQLite (aiosqlite + SQLAlchemy async) |
 | LLM | Google Gemini API |
 | スケジューラ | APScheduler (AsyncIOScheduler, Asia/Tokyo) |
@@ -49,8 +49,8 @@
 |------|--------|------|
 | 個別記事の要約 | gemini-2.5-flash | 各記事の要約・タグ生成・メタ的な学びの抽出 |
 | 一面まとめ（ダイジェスト） | gemini-2.5-pro | 全カテゴリの記事を俯瞰した日次サマリーを生成 |
-| 記事チャット | gemini-2.5-flash + RAG + Google Search | 記事本文を RAG コンテキストとし、必要に応じて Google 検索で補完して回答 |
-| 日毎チャット | gemini-2.5-flash + RAG + Google Search | その日の全記事要約をコンテキストとし、横断的な質問に回答 |
+| 記事チャット | gemini-2.5-flash + RAG + Google Search | 記事本文を RAG コンテキストとし、必要に応じて Google 検索で補完して回答。AI 応答はマークダウンでレンダリング |
+| 日毎チャット | gemini-2.5-flash + RAG + Google Search | その日の全記事要約をコンテキストとし、横断的な質問に回答。AI 応答はマークダウンでレンダリング |
 
 #### チャット Web 検索グラウンディング
 
