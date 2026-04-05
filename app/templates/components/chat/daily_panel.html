@@ -21,7 +21,7 @@
       {% if current_index > 0 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
               hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index - 1].id }}"
-              hx-target="#daily-chat-panel"
+              hx-target="closest .daily-chat-target"
               hx-swap="innerHTML">
         ‹
       </button>
@@ -34,7 +34,7 @@
       {% if current_index < total_sessions - 1 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
               hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index + 1].id }}"
-              hx-target="#daily-chat-panel"
+              hx-target="closest .daily-chat-target"
               hx-swap="innerHTML">
         ›
       </button>
@@ -48,14 +48,14 @@
     <div class="flex items-center gap-1.5 shrink-0">
       <button class="flex items-center gap-1 text-xs bg-white text-blue-700 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition font-medium"
               hx-post="/daily-chat/{{ date_str }}/sessions"
-              hx-target="#daily-chat-panel"
+              hx-target="closest .daily-chat-target"
               hx-swap="innerHTML">
         + 新規チャット
       </button>
       <button class="flex items-center gap-1 text-xs bg-blue-500 text-blue-100 border border-blue-400 px-2.5 py-1 rounded-lg hover:bg-blue-400 transition"
               hx-delete="/daily-chat/{{ date_str }}/sessions/{{ session.id }}"
               hx-confirm="このチャット「{{ session.title }}」を削除しますか？&#10;この操作は取り消せません。"
-              hx-target="#daily-chat-panel"
+              hx-target="closest .daily-chat-target"
               hx-swap="innerHTML">
         削除
       </button>
