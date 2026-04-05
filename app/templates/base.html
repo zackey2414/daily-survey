@@ -525,6 +525,10 @@
   fabChat.addEventListener('click', function() {
     if (window.Alpine && Alpine.store('dailyChat')) {
       var dateStr = Alpine.store('dailyChat').dateStr;
+      if (!dateStr) {
+        var sel = document.querySelector('select[onchange*="archive"]');
+        if (sel) dateStr = sel.value;
+      }
       if (dateStr) Alpine.store('dailyChat').toggle(dateStr);
     }
   });

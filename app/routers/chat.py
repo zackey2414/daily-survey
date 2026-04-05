@@ -215,7 +215,7 @@ async def send_message(
         "components/chat/messages.html",
         {
             "request": request,
-            "messages": [user_msg, ai_msg],
+            "messages": [ai_msg],
         },
     )
 
