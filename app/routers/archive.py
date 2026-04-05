@@ -148,4 +148,7 @@ def _sort_gt_items(
         period = key.replace("stars_", "")
         ranking_tag = f"ranking:{period}"
         items = [it for it in items if ranking_tag in it.tags]
-    return sorted(items, key=lambda it: _extract_star_tag(it, key), reverse=True)
+    sorted_items = sorted(
+        items, key=lambda it: _extract_star_tag(it, key), reverse=True
+    )
+    return sorted_items[:10]
