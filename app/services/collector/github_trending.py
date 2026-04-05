@@ -59,17 +59,37 @@ async def collect_github_trending(target_date: date | None = None) -> list[Artic
             if period != PERIODS[-1]:
                 await asyncio.sleep(_INTER_PAGE_DELAY)
 
-        # 2. キーワードフィルタ
+        # 2. キーワードフィルタ（不足分は非マッチから補填して各期間10件確保）
         keywords = _load_keywords()
+        min_per_period = settings.github_trending_max_results
         for period, repos in raw_by_period.items():
             filtered = _filter_by_keywords(repos, keywords)
-            raw_by_period[period] = filtered
             logger.info(f"GitHub Trending ({period}): フィルタ後 {len(filtered)} 件")
-
-        # 3. 上限適用
-        max_results = settings.github_trending_max_results
-        for period in PERIODS:
-            raw_by_period[period] = raw_by_period[period][:max_results]
+            if len(filtered) < min_per_period:
+                # 同期間の非マッチリポジトリで補填
+                filtered_urls = {r.url for r in filtered}
+                for repo in repos:
+                    if repo.url not in filtered_urls:
+                        filtered.append(repo)
+                        filtered_urls.add(repo.url)
+                    if len(filtered) >= min_per_period:
+                        break
+            if len(filtered) < min_per_period:
+                # それでも不足なら他期間のリポジトリから補填
+                for other_period in PERIODS:
+                    if other_period == period:
+                        continue
+                    for repo in raw_by_period.get(other_period, []):
+                        if repo.url not in filtered_urls:
+                            filtered.append(repo)
+                            filtered_urls.add(repo.url)
+                        if len(filtered) >= min_per_period:
+                            break
+                    if len(filtered) >= min_per_period:
+                        break
+            if len(filtered) != len(_filter_by_keywords(repos, keywords)):
+                logger.info(f"GitHub Trending ({period}): 補填後 {len(filtered)} 件")
+            raw_by_period[period] = filtered[:min_per_period]
 
         # 4. URL をキーにマージ（重複統合）
         merged = _merge_periods(raw_by_period)

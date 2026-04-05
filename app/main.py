@@ -66,14 +66,26 @@ app.include_router(user_tags.router)
 
 # 手動実行エンドポイント（デバッグ・テスト用）
 @app.post("/admin/run-pipeline")
-async def manual_run_pipeline(date_str: str | None = None):
-    """パイプラインを手動実行する（管理用）"""
+async def manual_run_pipeline(request: Request, date_str: str | None = None):
+    """パイプラインを手動実行する（管理用）
+
+    date_str: 収集日（YYYY-MM-DD）。省略時は今日の日付。
+    HTMX から hx-vals で送信される場合はフォームデータから取得。
+    """
     import asyncio
     from datetime import date, timedelta, datetime
     import pytz
     from app.services.pipeline import run_daily_pipeline
 
     JST = pytz.timezone("Asia/Tokyo")
+
+    # HTMX のフォームデータを優先的に取得
+    if not date_str and "hx-request" in request.headers:
+        try:
+            form = await request.form()
+            date_str = str(form.get("date_str", "")) or None
+        except Exception:
+            pass
 
     if date_str:
         try:
@@ -85,12 +97,16 @@ async def manual_run_pipeline(date_str: str | None = None):
 
     target_date = collection_date - timedelta(days=1)
     asyncio.create_task(run_daily_pipeline(collection_date))
-    return {
-        "message": (
-            f"収集日 {collection_date.isoformat()} / 対象日 {target_date.isoformat()} "
-            "のパイプラインを非同期で開始しました"
-        )
-    }
+
+    msg = (
+        f"収集日 {collection_date.isoformat()} / 対象日 {target_date.isoformat()} "
+        "のパイプラインを非同期で開始しました"
+    )
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(f'<span class="text-emerald-600 text-xs">✓ {msg}</span>')
+    return {"message": msg}
 
 
 @app.post("/admin/reprocess-summaries")

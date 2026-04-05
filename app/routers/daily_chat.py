@@ -229,7 +229,7 @@ async def send_message(
 
     return templates.TemplateResponse(
         "components/chat/messages.html",
-        {"request": request, "messages": [user_msg, ai_msg]},
+        {"request": request, "messages": [ai_msg]},
     )
 
 

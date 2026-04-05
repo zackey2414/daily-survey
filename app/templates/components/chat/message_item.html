@@ -10,18 +10,20 @@
       {% else %}
         bg-gray-100 text-gray-800
       {% endif %}">
-      {% if msg.role == 'assistant' and msg.used_search %}
+      {% if msg.role == 'user' %}
+        {{ msg.content | replace('\n', '<br>') | safe }}
+      {% elif msg.role == 'assistant' and msg.used_search %}
         {% set sources = msg.search_sources_parsed %}
-        {% set ns = namespace(content=msg.content | replace('\n', '<br>')) %}
+        {% set ns = namespace(content=msg.content | markdown) %}
         {% for src in sources %}
           {% set idx = loop.index %}
           {% set badge = '[' ~ idx ~ ']' %}
           {% set link = '<a href="' ~ src.uri ~ '" target="_blank" rel="noopener" class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-blue-600 bg-blue-100 rounded hover:bg-blue-200 no-underline align-super leading-none" title="' ~ (src.title or src.uri) ~ '">' ~ idx ~ '</a>' %}
           {% set ns.content = ns.content | replace(badge, link) %}
         {% endfor %}
-        {{ ns.content | safe }}
+        <div class="prose prose-sm">{{ ns.content | safe }}</div>
       {% else %}
-        {{ msg.content | replace('\n', '<br>') | safe }}
+        <div class="prose prose-sm">{{ msg.content | markdown | safe }}</div>
       {% endif %}
     </div>
     {% if msg.role == 'assistant' and msg.used_search %}

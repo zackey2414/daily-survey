@@ -49,7 +49,7 @@ class Settings:
     github_token: str = os.getenv("GITHUB_TOKEN", "")
 
     # GitHub Trending 設定
-    github_trending_max_results: int = 20  # 各期間あたりの取得上限
+    github_trending_max_results: int = 10  # 各期間あたりの取得上限（各タブ10件表示）
     github_trending_stale_days: int = 30  # 再収集の閾値（日数）
     github_trending_keywords: list[str] = [
         "AI",
