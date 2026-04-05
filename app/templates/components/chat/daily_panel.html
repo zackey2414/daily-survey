@@ -11,12 +11,13 @@
 <div class="bg-blue-50 h-full flex flex-col" id="daily-chat-container">
 
   <!-- チャットヘッダー -->
-  <div class="px-3 py-2 bg-blue-600 text-white border-b border-blue-700 flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm shrink-0">
-    <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+  <div class="px-3 py-2 bg-blue-600 text-white border-b border-blue-700 shrink-0 space-y-1.5">
+    <!-- 上段: 閉じる + 日付 + ナビ + タイトル -->
+    <div class="flex items-center gap-1.5 min-w-0 text-xs sm:text-sm">
       <button onclick="if(window.Alpine)Alpine.store('dailyChat').open=false"
               class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-400 text-white transition shrink-0 text-xs"
               title="チャットを閉じる">✕</button>
-      <span class="text-blue-100 shrink-0">{{ date_str }}</span>
+      <span class="text-blue-100 shrink-0 text-xs">{{ date_str }}</span>
 
       {% if current_index > 0 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
@@ -29,7 +30,7 @@
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 text-blue-300 cursor-not-allowed shrink-0" disabled>‹</button>
       {% endif %}
 
-      <span class="text-white font-medium truncate max-w-[120px] sm:max-w-48">{{ session.title }}</span>
+      <span class="text-white font-medium truncate min-w-0 flex-1">{{ session.title }}</span>
 
       {% if current_index < total_sessions - 1 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
@@ -44,8 +45,8 @@
 
       <span class="text-xs text-blue-200 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
     </div>
-
-    <div class="flex items-center gap-1.5 shrink-0">
+    <!-- 下段: アクションボタン -->
+    <div class="flex items-center gap-1.5">
       <button class="flex items-center gap-1 text-xs bg-white text-blue-700 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition font-medium"
               hx-post="/daily-chat/{{ date_str }}/sessions"
               hx-target="closest .daily-chat-target"
