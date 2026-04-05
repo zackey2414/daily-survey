@@ -24,6 +24,7 @@ GitHub Trending の3つの期間ページ（Daily / Weekly / Monthly）をスク
    └─ daily → 10秒待機 → weekly → 10秒待機 → monthly
 
 2. キーワードフィルタリング（AI/LLM 関連のみ抽出）
+   └─ 10件未満の場合は非マッチリポジトリから補填
 
 3. 各期間上限10件に絞り込み
 
