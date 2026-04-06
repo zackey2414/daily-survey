@@ -3,8 +3,8 @@
   必要変数: msg (ChatMessage)
 -->
 <div class="flex {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-  <div class="max-w-[85%]">
-    <div class="rounded-xl px-4 py-2 text-sm leading-relaxed
+  <div class="max-w-[85%] min-w-0 overflow-hidden">
+    <div class="rounded-xl px-3 sm:px-4 py-2 text-sm leading-relaxed break-words overflow-hidden
       {% if msg.role == 'user' %}
         bg-blue-600 text-white
       {% else %}

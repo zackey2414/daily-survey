@@ -12,11 +12,11 @@
 <div class="bg-white" id="chat-container-{{ aid }}">
 
   <!-- チャットヘッダー（ナビゲーション） -->
-  <div class="px-3 py-2 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-1 text-xs sm:text-sm">
-    <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+  <div class="px-3 py-2 bg-gray-50 border-b space-y-1.5 text-xs sm:text-sm">
+    <!-- 上段: ナビゲーション -->
+    <div class="flex items-center gap-1.5 min-w-0">
       <span class="text-gray-500 shrink-0">チャット</span>
 
-      <!-- 前のチャットへ -->
       {% if current_index > 0 %}
       <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
               hx-get="/chat/{{ article.id }}/sessions/{{ all_sessions[current_index - 1].id }}"
@@ -28,9 +28,8 @@
       <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>‹</button>
       {% endif %}
 
-      <span class="text-gray-700 font-medium truncate max-w-[100px] sm:max-w-40">{{ session.title }}</span>
+      <span class="text-gray-700 font-medium truncate min-w-0 flex-1">{{ session.title }}</span>
 
-      <!-- 次のチャットへ -->
       {% if current_index < total_sessions - 1 %}
       <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
               hx-get="/chat/{{ article.id }}/sessions/{{ all_sessions[current_index + 1].id }}"
@@ -44,18 +43,14 @@
 
       <span class="text-xs text-gray-400 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
     </div>
-
-    <!-- 右側ボタン群 -->
-    <div class="flex items-center gap-1.5 shrink-0">
-      <!-- 新規チャット（常に有効。バックエンドで空セッション重複を防止） -->
+    <!-- 下段: アクションボタン -->
+    <div class="flex items-center gap-1.5">
       <button class="flex items-center gap-1 text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-lg hover:bg-emerald-700 transition"
               hx-post="/chat/{{ article.id }}/sessions"
               hx-target="#chat-panel-{{ aid }}"
               hx-swap="innerHTML">
         ＋ 新規チャット
       </button>
-
-      <!-- チャット削除 -->
       <button class="flex items-center gap-1 text-xs bg-white text-red-500 border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition"
               hx-delete="/chat/{{ article.id }}/sessions/{{ session.id }}"
               hx-confirm="このチャット「{{ session.title }}」を削除しますか？&#10;この操作は取り消せません。"
@@ -95,6 +90,8 @@
             u.className = 'flex justify-end';
             u.innerHTML = '<div class=\'max-w-[85%]\'><div class=\'rounded-xl px-4 py-2 text-sm leading-relaxed bg-blue-600 text-white\'>' + userText.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div></div>';
             msgs.appendChild(u);
+            ta.value = '';
+            ta.style.height = 'auto';
           }
           var t = document.createElement('div');
           t.id = 'thinking-{{ session.id }}';

@@ -89,8 +89,10 @@
     .prose strong { font-weight: 700; color: #111827; }
     .prose a { color: #2563eb; text-decoration: underline; text-decoration-color: #bfdbfe; text-underline-offset: 2px; transition: text-decoration-color 0.15s; }
     .prose a:hover { text-decoration-color: #2563eb; }
-    .prose code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: #475569; }
+    .prose code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: #475569; word-break: break-all; }
+    .prose pre { overflow-x: auto; max-width: 100%; }
     .prose blockquote { border-left: 3px solid #c7d2fe; padding-left: 1rem; color: #6b7280; margin: 0.75rem 0; font-style: italic; }
+    .prose img, .prose table { max-width: 100%; overflow-x: auto; display: block; }
 
     /* チャット（記事カード内埋め込み用） */
     .card .chat-messages { max-height: 400px; overflow-y: auto; }
@@ -111,9 +113,9 @@
       <span class="text-lg leading-none">📰</span>
       <span class="font-bold text-sm sm:text-base text-white tracking-tight group-hover:text-blue-300 transition-colors">AI Daily Survey</span>
     </a>
-    <nav class="flex items-center gap-1 text-sm">
+    <nav class="flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm">
       <a href="/"
-         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+         class="px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all duration-150
            {% if request.url.path == '/' or request.url.path.startswith('/archive') %}
              bg-white/15 text-white
            {% else %}
@@ -122,7 +124,7 @@
         今日
       </a>
       <a href="/summaries"
-         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+         class="px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all duration-150
            {% if request.url.path.startswith('/summaries') %}
              bg-white/15 text-white
            {% else %}
@@ -131,7 +133,7 @@
         まとめ
       </a>
       <a href="/tags"
-         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+         class="px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all duration-150
            {% if request.url.path.startswith('/tags') %}
              bg-white/15 text-white
            {% else %}
@@ -140,7 +142,7 @@
         タグ
       </a>
       <a href="/chat/search"
-         class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150
+         class="px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all duration-150
            {% if request.url.path.startswith('/chat/search') %}
              bg-white/15 text-white
            {% else %}

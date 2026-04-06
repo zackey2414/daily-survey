@@ -242,7 +242,7 @@
      :class="$store.dailyChat.open ? 'lg:w-[420px] lg:opacity-100' : 'lg:w-0 lg:opacity-0 lg:overflow-hidden'"
      class="hidden lg:flex flex-col shrink-0 bg-blue-50 border-l border-blue-200 sticky top-[52px] h-[calc(100vh-52px)] transition-all duration-300 ease-out">
   <!-- チャットコンテンツ（HTMX で差し替え） -->
-  <div id="daily-chat-panel" class="flex-1 flex flex-col overflow-hidden w-[420px]">
+  <div id="daily-chat-panel" class="daily-chat-target flex-1 flex flex-col overflow-hidden w-[420px]">
     <div class="flex items-center justify-center h-full text-blue-400 text-sm">
       <div class="flex items-center gap-2">
         <span class="inline-block w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></span>
@@ -276,7 +276,7 @@
        x-transition:leave-end="translate-x-full"
        class="relative w-full max-w-md bg-blue-50 shadow-2xl border-l border-blue-200 flex flex-col h-full">
     <!-- モバイル用チャットコンテンツ（HTMX で差し替え） -->
-    <div id="daily-chat-panel-mobile" class="flex-1 flex flex-col overflow-hidden">
+    <div id="daily-chat-panel-mobile" class="daily-chat-target flex-1 flex flex-col overflow-hidden">
       <div class="flex items-center justify-center h-full text-blue-400 text-sm">
         <div class="flex items-center gap-2">
           <span class="inline-block w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></span>
