@@ -469,11 +469,17 @@
     });
     stickyOffset += sectionStack.length >= 2 ? 40 : 8; // サブあり: 大きめ余白、なし: 小さめ
 
-    var delay = ancestors.length > 0 ? 260 : 50;
-    setTimeout(function () {
-      var top = target.getBoundingClientRect().top + window.scrollY - stickyOffset;
-      window.scrollTo({ top: top, behavior: 'smooth' });
-    }, delay);
+    // 要素が表示されるまで待ってからスクロール（x-show トランジション完了を待つ）
+    var maxWait = 2000;
+    var start = Date.now();
+    (function waitAndScroll() {
+      if (target.offsetHeight > 0) {
+        var top = target.getBoundingClientRect().top + window.scrollY - stickyOffset;
+        window.scrollTo({ top: top, behavior: 'smooth' });
+      } else if (Date.now() - start < maxWait) {
+        requestAnimationFrame(waitAndScroll);
+      }
+    })();
   }
 
   document.addEventListener('alpine:initialized', function () {
