@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db.database import init_db, migrate_db
@@ -62,6 +63,9 @@ app.include_router(summaries.router)
 app.include_router(chat.router)
 app.include_router(daily_chat.router)
 app.include_router(user_tags.router)
+
+# 静的ファイル配信
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 # 手動実行エンドポイント（デバッグ・テスト用）

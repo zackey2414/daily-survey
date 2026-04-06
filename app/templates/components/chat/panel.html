@@ -81,63 +81,11 @@
         hx-post="/chat/{{ article.id }}/sessions/{{ session.id }}/messages"
         hx-target="#messages-{{ session.id }}"
         hx-swap="beforeend"
-        hx-on::before-request="
-          var msgs = document.getElementById('messages-{{ session.id }}');
-          var ta = this.querySelector('textarea');
-          var userText = ta ? ta.value.trim() : '';
-          if (userText) {
-            var u = document.createElement('div');
-            u.className = 'flex justify-end';
-            u.innerHTML = '<div class=\'max-w-[85%]\'><div class=\'rounded-xl px-4 py-2 text-sm leading-relaxed bg-blue-600 text-white\'>' + userText.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div></div>';
-            msgs.appendChild(u);
-            ta.value = '';
-            ta.style.height = 'auto';
-          }
-          var t = document.createElement('div');
-          t.id = 'thinking-{{ session.id }}';
-          t.className = 'flex justify-start';
-          t.innerHTML = `<div class='bg-gray-100 rounded-2xl px-4 py-2.5 text-sm text-gray-500'>
-            <div class='flex items-center gap-2'>
-              <span class='inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin'></span>
-              <span id='thinking-label-{{ session.id }}'>思考中...</span>
-            </div>
-          </div>`;
-          msgs.appendChild(t);
-          msgs.scrollTop = 9999;
-          this._searchTimer = setTimeout(function(){
-            var label = document.getElementById('thinking-label-{{ session.id }}');
-            if (!label) return;
-            label.closest('.bg-gray-100').innerHTML = `
-              <div class='flex items-center gap-2'>
-                <svg class='w-3.5 h-3.5 animate-spin text-blue-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/>
-                </svg>
-                <span class='text-blue-600'>Web検索中...</span>
-              </div>
-              <div class='mt-1 flex gap-1'>
-                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:0ms'></span>
-                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:150ms'></span>
-                <span class='inline-block w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce' style='animation-delay:300ms'></span>
-              </div>`;
-          }, 3000);
-          var btn = document.getElementById('chat-submit-{{ session.id }}');
-          btn.disabled = true;
-          btn.classList.add('opacity-40', 'cursor-not-allowed');
-          btn.classList.remove('hover:bg-blue-700');
-        "
-        hx-on::after-request="
-          if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
-          var t = document.getElementById('thinking-{{ session.id }}');
-          if (t) t.remove();
-          this.reset();
-          var ta = this.querySelector('textarea');
-          if (ta) ta.style.height = 'auto';
-          var btn = document.getElementById('chat-submit-{{ session.id }}');
-          btn.disabled = false;
-          btn.classList.remove('opacity-40', 'cursor-not-allowed');
-          btn.classList.add('hover:bg-blue-700');
-          document.getElementById('messages-{{ session.id }}').scrollTop = 9999;
-        ">
+        data-chat-form
+        data-messages-id="messages-{{ session.id }}"
+        data-thinking-id="thinking-{{ session.id }}"
+        data-thinking-label-id="thinking-label-{{ session.id }}"
+        data-submit-btn-id="chat-submit-{{ session.id }}">
     <textarea name="message" required rows="1"
               placeholder="質問を入力… (Ctrl+Enter で送信)"
               class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-hidden"
