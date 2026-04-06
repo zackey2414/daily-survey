@@ -8,6 +8,15 @@
     return form && form.hasAttribute("data-chat-form");
   }
 
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   document.body.addEventListener("htmx:beforeRequest", function (evt) {
     var form = evt.detail.elt;
     if (!isChatForm(form)) return;
@@ -29,7 +38,7 @@
       u.innerHTML =
         '<div class="max-w-[85%] min-w-0 overflow-hidden">' +
         '<div class="rounded-xl px-3 sm:px-4 py-2 text-sm leading-relaxed break-words overflow-hidden bg-blue-600 text-white">' +
-        userText.replace(/</g, "&lt;").replace(/\n/g, "<br>") +
+        escapeHtml(userText).replace(/\n/g, "<br>") +
         "</div></div>";
       msgs.appendChild(u);
       ta.value = "";
