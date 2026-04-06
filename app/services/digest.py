@@ -20,7 +20,7 @@ _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 
 genai.configure(api_key=settings.gemini_api_key)
 
-CITATION_RE = re.compile(r"\[ref:([a-z0-9_\-]+)\]")
+CITATION_RE = re.compile(r"\[ref:([a-z0-9_\-]+(?:,\s*ref:[a-z0-9_\-]+)*)\]")
 
 
 def _get_model() -> genai.GenerativeModel:
@@ -28,15 +28,18 @@ def _get_model() -> genai.GenerativeModel:
 
 
 def inject_citations(text: str, date_str: str, is_archive: bool) -> str:
-    """[ref:safe_id] をMarkdownリンクに変換する"""
+    """[ref:safe_id] や [ref:id1, ref:id2] をMarkdownリンクに変換する"""
 
-    def replace(m: re.Match) -> str:
-        safe_id = m.group(1)
+    def _make_link(safe_id: str) -> str:
         if is_archive:
             href = f"#article-{safe_id}"
         else:
             href = f"/archive/{date_str}#article-{safe_id}"
         return f"[↗]({href})"
+
+    def replace(m: re.Match) -> str:
+        ids = re.split(r",\s*ref:", m.group(1))
+        return " ".join(_make_link(sid) for sid in ids)
 
     return CITATION_RE.sub(replace, text)
 
