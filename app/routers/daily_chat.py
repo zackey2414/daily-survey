@@ -373,12 +373,13 @@ async def _render_daily_chat_panel(
 
 def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
     """レスポンスからグラウンディング情報を抽出する"""
+    text = response.text or ""
     try:
         meta = response.candidates[0].grounding_metadata
         if not meta or not meta.grounding_chunks:
-            return False, [], response.text
+            return False, [], text
     except (AttributeError, IndexError):
-        return False, [], response.text
+        return False, [], text
 
     sources: list[dict] = []
     for chunk in meta.grounding_chunks:
@@ -387,9 +388,7 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
             sources.append({"title": web.title or "", "uri": web.uri or ""})
 
     if not sources:
-        return False, [], response.text
-
-    text = response.text
+        return False, [], text
     supports = meta.grounding_supports or []
     if supports:
         indexed = []

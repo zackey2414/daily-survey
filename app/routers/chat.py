@@ -407,12 +407,13 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
         - sources: [{"title": str, "uri": str}, ...]
         - cited_text: インライン引用 [1][2] を埋め込んだテキスト
     """
+    text = response.text or ""
     try:
         meta = response.candidates[0].grounding_metadata
         if not meta or not meta.grounding_chunks:
-            return False, [], response.text
+            return False, [], text
     except (AttributeError, IndexError):
-        return False, [], response.text
+        return False, [], text
 
     # ソース一覧を構築
     sources: list[dict] = []
@@ -422,10 +423,9 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
             sources.append({"title": web.title or "", "uri": web.uri or ""})
 
     if not sources:
-        return False, [], response.text
+        return False, [], text
 
     # grounding_supports からインライン引用を挿入
-    text = response.text
     supports = meta.grounding_supports or []
     if supports:
         # end_index 降順でソート（後ろから挿入して位置ズレを防ぐ）
