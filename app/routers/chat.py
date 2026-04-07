@@ -327,7 +327,9 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
         "ai",
         "cl",
         "industry",
+        "industry_news",
         "community",
+        "github_trending",
         "python",
     ]
     for date_str in list_available_dates():

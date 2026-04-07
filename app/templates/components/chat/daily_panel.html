@@ -2,7 +2,7 @@
   日毎チャットパネル (daily_panel.html)
   必要変数:
     date_str       : str (YYYY-MM-DD)
-    session        : ChatSession
+    session        : ChatSession | None
     messages       : list[ChatMessage]
     all_sessions   : list[ChatSession]
     current_index  : int
@@ -19,6 +19,7 @@
               title="チャットを閉じる">✕</button>
       <span class="text-blue-100 shrink-0 text-xs">{{ date_str }}</span>
 
+      {% if session %}
       {% if current_index > 0 %}
       <button class="px-1.5 py-0.5 rounded border border-blue-400 bg-blue-500 hover:bg-blue-400 text-white shrink-0"
               hx-get="/daily-chat/{{ date_str }}/sessions/{{ all_sessions[current_index - 1].id }}"
@@ -44,8 +45,12 @@
       {% endif %}
 
       <span class="text-xs text-blue-200 shrink-0">{{ current_index + 1 }}/{{ total_sessions }}</span>
+      {% else %}
+      <span class="text-white font-medium truncate min-w-0 flex-1">新しいチャット</span>
+      {% endif %}
     </div>
     <!-- 下段: アクションボタン -->
+    {% if session %}
     <div class="flex items-center gap-1.5">
       <button class="flex items-center gap-1 text-xs bg-white text-blue-700 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition font-medium"
               hx-post="/daily-chat/{{ date_str }}/sessions"
@@ -61,9 +66,11 @@
         削除
       </button>
     </div>
+    {% endif %}
   </div>
 
   <!-- メッセージ一覧 -->
+  {% if session %}
   <div class="chat-messages px-4 py-3 space-y-3 overflow-y-auto flex-1"
        id="daily-messages-{{ session.id }}">
     {% for msg in messages %}
@@ -75,8 +82,17 @@
     </p>
     {% endif %}
   </div>
+  {% else %}
+  <div class="chat-messages px-4 py-3 space-y-3 overflow-y-auto flex-1"
+       id="daily-messages-new">
+    <p class="text-center text-gray-400 text-sm py-4">
+      {{ date_str }} の記事全体について質問してください
+    </p>
+  </div>
+  {% endif %}
 
   <!-- 入力フォーム -->
+  {% if session %}
   <form class="px-4 py-3 border-t border-blue-200 bg-blue-100/50 flex gap-2 items-end shrink-0"
         id="daily-chat-form-{{ session.id }}"
         hx-post="/daily-chat/{{ date_str }}/sessions/{{ session.id }}/messages"
@@ -99,5 +115,30 @@
       送信
     </button>
   </form>
+  {% else %}
+  <!-- 初回メッセージ用フォーム: セッション作成 + メッセージ送信を同時に行う -->
+  <form class="px-4 py-3 border-t border-blue-200 bg-blue-100/50 flex gap-2 items-end shrink-0"
+        id="daily-chat-form-new"
+        hx-post="/daily-chat/{{ date_str }}/first-message"
+        hx-target="closest .daily-chat-target"
+        hx-swap="innerHTML"
+        data-chat-form
+        data-messages-id="daily-messages-new"
+        data-thinking-id="daily-thinking-new"
+        data-thinking-label-id="daily-thinking-label-new"
+        data-submit-btn-id="daily-chat-submit-new">
+    <textarea name="message" required rows="1"
+              placeholder="今日の記事について質問… (Ctrl+Enter で送信)"
+              class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-hidden"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();this.closest('form').requestSubmit();}"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
+    <button type="submit"
+            id="daily-chat-submit-new"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition shrink-0">
+      送信
+    </button>
+  </form>
+  {% endif %}
 
 </div>
