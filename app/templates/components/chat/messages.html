@@ -1,7 +1,11 @@
 <!--
   HTMX で append されるメッセージ断片 (chat_messages.html)
   必要変数: messages (list[ChatMessage])
+  オプション: new_title (str), title_element_id (str) — タイトル自動生成時にOOB swapで即時反映
 -->
 {% for msg in messages %}
 {% include "components/chat/message_item.html" %}
 {% endfor %}
+{% if new_title and title_element_id %}
+<span id="{{ title_element_id }}" hx-swap-oob="innerHTML">{{ new_title }}</span>
+{% endif %}

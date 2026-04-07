@@ -205,19 +205,22 @@ async def send_message(
     db.add(ai_msg)
 
     # 初回メッセージのときセッションタイトルを自動生成
+    new_title = None
     if len(chat_session.messages) == 0:
-        chat_session.title = await _generate_title(message)
+        new_title = await _generate_title(message)
+        chat_session.title = new_title
 
     await db.commit()
 
     # 新しいメッセージのみ HTML で返す（HTMX append）
-    return templates.TemplateResponse(
-        "components/chat/messages.html",
-        {
-            "request": request,
-            "messages": [ai_msg],
-        },
-    )
+    ctx: dict = {
+        "request": request,
+        "messages": [ai_msg],
+    }
+    if new_title:
+        ctx["new_title"] = new_title
+        ctx["title_element_id"] = f"chat-title-{session_id}"
+    return templates.TemplateResponse("components/chat/messages.html", ctx)
 
 
 # ── セッション削除 ──────────────────────────────────────────────────

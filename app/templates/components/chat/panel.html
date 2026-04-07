@@ -28,7 +28,7 @@
       <button class="px-1.5 py-0.5 rounded border bg-white text-gray-300 cursor-not-allowed shrink-0" disabled>‹</button>
       {% endif %}
 
-      <span class="text-gray-700 font-medium truncate min-w-0 flex-1">{{ session.title }}</span>
+      <span class="text-gray-700 font-medium truncate min-w-0 flex-1" id="chat-title-{{ session.id }}">{{ session.title }}</span>
 
       {% if current_index < total_sessions - 1 %}
       <button class="px-1.5 py-0.5 rounded border bg-white hover:bg-gray-100 text-gray-600 shrink-0"
