@@ -20,10 +20,13 @@ app/
 │   ├── summaries.py     # GET /summaries, /summaries/{date} — サマリー閲覧
 │   ├── tags.py          # GET /tags/, /tags/{name} — タグ一覧・タグ別記事
 │   ├── user_tags.py     # POST/DELETE /user-tags/ — ユーザータグ CRUD (HTMX)
+│   ├── themes.py        # GET /themes, /themes/{id} + /admin/themes/* — 検索テーマ管理・オンデマンド検索 (HTMX)
 │   └── chat.py          # チャット機能 (セッション管理, メッセージ送受信, RAG + Google Search)
 ├── services/
-│   ├── pipeline.py      # 日次パイプライン統括 (収集 → 要約 → ダイジェスト → 通知)
+│   ├── pipeline.py      # 日次パイプライン統括 (収集 → 要約 → テーマ検索 → ダイジェスト → 通知)
 │   ├── summarizer.py    # Gemini による個別記事要約 (paper / industry / article)
+│   ├── themes.py        # 検索テーマのレジストリ (data/themes.json) + Gemini キーワード生成
+│   ├── theme_search.py  # テーマのハイブリッド収集 (arXiv 専用検索 + 収集済みアイテムのフィルタ)
 │   ├── digest.py        # 一面まとめ (ダイジェスト) 生成・Markdown 保存
 │   ├── rag.py           # RAG コンテキスト構築 (URL フェッチ, チャンク分割, Jaccard スコアリング)
 │   ├── notifier.py      # SMTP メール通知
@@ -44,6 +47,8 @@ app/
     │   ├── tags.html
     │   ├── tags_list.html
     │   ├── chat_search.html
+    │   ├── themes_list.html    # 検索テーマ一覧 + 管理 UI
+    │   ├── theme_detail.html   # テーマ別の収集結果 (日付横断)
     │   └── error.html
     └── components/      # HTMX swap 用部分テンプレート
         ├── article/     # 記事カード・要約表示
@@ -51,6 +56,7 @@ app/
         │   ├── panel.html
         │   ├── messages.html
         │   └── message_item.html
+        ├── theme/       # テーマ管理カード・キーワードチップ (HTMX フラグメント)
         └── tags/        # タグ管理 UI
 ```
 
@@ -115,8 +121,9 @@ RAG コンテキスト構築の流れ:
 1. 全カテゴリの記事を並列収集 (`collector/*`)
 2. 収集結果を JSON 保存 + 重複除去
 3. 未要約アイテムを Gemini で要約 (`summarizer.py`)
-4. 全カテゴリ横断の一面まとめを生成 (`digest.py`)
-5. メール通知 (`notifier.py`)
+4. 有効な検索テーマごとに該当論文・記事を収集・保存 (`theme_search.py`)
+5. 全カテゴリ横断の一面まとめを生成 (`digest.py`)
+6. メール通知 (`notifier.py`)
 
 ### `db/database.py` マイグレーション
 

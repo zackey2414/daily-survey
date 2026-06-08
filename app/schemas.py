@@ -74,3 +74,30 @@ class DailySummaryMeta(BaseModel):
     title: str = ""
     preview: str = ""  # 冒頭 200文字
     file_path: str = ""
+
+
+class Theme(BaseModel):
+    """ユーザー定義の検索テーマ（data/themes.json に保存）"""
+
+    id: str  # uuid4().hex[:12]（英数字のみ → CSS セレクタ・アンカー安全）
+    name: str  # 表示名（例: "Edge-Cloud"）
+    keywords: list[str] = []  # 検索に使う関連ワード（Gemini 生成 + 手動編集）
+    enabled: bool = True  # 日次パイプラインの検索対象にするか
+    created_at: str = ""  # ISO 8601 (JST)
+
+
+class ThemeCollection(BaseModel):
+    """1テーマの1日分の検索結果（data/{date}/themes/{theme_id}.json）"""
+
+    theme_id: str
+    theme_name: str
+    keywords_snapshot: list[str] = []  # 検索時点のキーワード（後で編集されるため記録）
+    date: str  # "YYYY-MM-DD"（検索対象日 = 前日 JST）
+    collection_date: str = ""  # "YYYY-MM-DD"（収集実行日 JST, ディレクトリ名）
+    collected_at: str = ""  # ISO 8601 収集実行日時
+    source_coverage: list[str] = []  # この日に実際に検索/フィルタできたソース名
+    total: int = 0
+    items: list[ArticleItem] = Field(default_factory=list)
+
+    def model_post_init(self, __context) -> None:
+        self.total = len(self.items)
