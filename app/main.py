@@ -162,7 +162,13 @@ async def reprocess_summaries(date_str: str | None = None):
             target_date_str = raw.get("date", date_str)
 
         paper_cats = ["cv", "lg", "ai", "cl"]
-        article_cats = ["industry", "industry_news", "community", "github_trending"]
+        article_cats = [
+            "industry",
+            "industry_news",
+            "community",
+            "github_trending",
+            "ai_dev",
+        ]
         tasks = [summarize_items(data[c], "paper") for c in paper_cats] + [
             summarize_items(data[c], "article") for c in article_cats
         ]

@@ -21,6 +21,7 @@ from app.services.collector.industry import collect_industry
 from app.services.collector.industry_news import collect_industry_news
 from app.services.collector.community import collect_community
 from app.services.collector.github_trending import collect_github_trending
+from app.services.collector.ai_dev import collect_ai_dev
 from app.services.summarizer import summarize_items
 from app.services.digest import generate_digest, load_digest
 from app.services.notifier import CollectionReport, send_completion_email
@@ -100,6 +101,14 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     except Exception as e:
         errors.append(f"GitHub Trending: {e}")
         logger.error(f"GitHub Trending 収集失敗: {e}")
+    await asyncio.sleep(_INTER_SOURCE_DELAY)
+
+    ai_dev_items: list[ArticleItem] = []
+    try:
+        ai_dev_items = await collect_ai_dev(target_date)
+    except Exception as e:
+        errors.append(f"LLM・AIエージェント動向: {e}")
+        logger.error(f"LLM・AIエージェント動向 収集失敗: {e}")
 
     lg_papers = arxiv_results.get("cs.LG", [])
     ai_papers = arxiv_results.get("cs.AI", [])
@@ -138,6 +147,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_news_items,
         community_items,
         github_trending_items,
+        ai_dev_items,
     ) = await asyncio.gather(
         summarize_items(cv_arxiv_papers, "paper"),
         summarize_items(openreview_items, "paper"),
@@ -148,6 +158,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         summarize_items(industry_news_items, "industry"),
         summarize_items(community_items, "article"),
         summarize_items(github_trending_items, "article"),
+        summarize_items(ai_dev_items, "industry"),
     )
 
     # ── 3. JSON 保存 ────────────────────────────────────────────
@@ -167,6 +178,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     _save_collection(
         collection_date_str, target_date_str, "github_trending", github_trending_items
     )
+    _save_collection(collection_date_str, target_date_str, "ai_dev", ai_dev_items)
 
     # 収集件数を記録
     report.counts = {
@@ -179,6 +191,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         "企業動向（その他報道）": len(industry_news_items),
         "コミュニティ": len(community_items),
         "GitHub Trending": len(github_trending_items),
+        "LLM・AIエージェント動向": len(ai_dev_items),
     }
 
     # 要約失敗件数を集計してレポートに反映（無音の劣化を可視化）
@@ -192,6 +205,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_news_items,
         community_items,
         github_trending_items,
+        ai_dev_items,
     ]
     summarize_failures = sum(
         1 for batch in _all_batches for it in batch if not it.summarized
@@ -239,6 +253,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         industry_news_items,
         community_items,
         github_trending_items,
+        ai_dev_items,
     )
 
     # ── 3.5. テーマ検索 ────────────────────────────────────────
@@ -257,6 +272,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
             "industry_news": industry_news_items,
             "community": community_items,
             "github_trending": github_trending_items,
+            "ai_dev": ai_dev_items,
         },
         report,
         errors,
@@ -274,6 +290,7 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
             industry_items,
             community_items,
             github_trending_items,
+            ai_dev_items,
             target_date_str=target_date_str,
         )
         digest_content = load_digest(collection_date_str) or ""
@@ -308,6 +325,7 @@ def _save_collection(
         "community",
         "python",
         "github_trending",
+        "ai_dev",
     ],
     items: list[ArticleItem],
 ) -> None:
@@ -350,6 +368,7 @@ async def _register_articles_to_db(
         "industry_news",
         "community",
         "github_trending",
+        "ai_dev",
     ]
 
     async with AsyncSessionLocal() as session:
@@ -419,6 +438,7 @@ def load_daily_data(date_str: str) -> dict[str, list[ArticleItem]]:
         "industry_news",
         "community",
         "github_trending",
+        "ai_dev",
     ]
     result: dict[str, list[ArticleItem]] = {}
 

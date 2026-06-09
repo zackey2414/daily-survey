@@ -60,6 +60,7 @@ def _build_daily_rag_context(date_str: str) -> str:
         "industry_news": "企業動向（その他報道）",
         "community": "コミュニティ",
         "github_trending": "GitHub Trending",
+        "ai_dev": "LLM・AIエージェント動向",
     }
 
     for cat, items in data.items():

@@ -130,6 +130,76 @@ class Settings:
         "Perplexity",
     ]
 
+    # ── LLM・AIエージェント動向（ai_dev カテゴリ） ──────────────
+    # コーディングAI ツール・LLM ベンダーの公式アップデート（changelog/release/blog）RSS。
+    # 既存 industry とは別に、Claude Code / Codex / Cursor / Copilot などの開発ツールや
+    # Mistral / HuggingFace / DeepMind のモデルリリースを横断収集する。
+    # （URL は 2026-06 時点で feed XML を返すことを確認済み）
+    ai_dev_rss_feeds: dict[str, str] = {
+        "Claude Code": "https://github.com/anthropics/claude-code/releases.atom",
+        "OpenAI Codex": "https://github.com/openai/codex/releases.atom",
+        "Cursor": "https://www.cursor.com/changelog/rss.xml",
+        "GitHub Copilot": "https://github.blog/changelog/label/copilot/feed/",
+        "Mistral": "https://mistral.ai/rss.xml",
+        "Hugging Face": "https://huggingface.co/blog/feed.xml",
+        "Google DeepMind": "https://deepmind.google/blog/rss.xml",
+    }
+    ai_dev_max_per_source: int = 5  # 公式フィード1ソースあたりの上限
+
+    # LLM/エージェント/コーディングAI の性能・ベンチマーク記事を扱う実務寄りニュース源。
+    # ai_dev_filter_keywords でフィルタする。
+    ai_dev_news_feeds: list[str] = [
+        "https://simonwillison.net/atom/everything/",
+        "https://venturebeat.com/category/ai/feed/",
+        "https://jack-clark.net/feed/",
+    ]
+    ai_dev_news_max_results: int = 15
+    # LLM/AIエージェント/コーディングAI 関連かを判定するキーワード
+    ai_dev_filter_keywords: list[str] = [
+        "LLM",
+        "large language model",
+        "frontier model",
+        "foundation model",
+        "GPT",
+        "ChatGPT",
+        "Claude",
+        "Claude Code",
+        "Anthropic",
+        "OpenAI",
+        "Codex",
+        "Gemini",
+        "Gemma",
+        "DeepMind",
+        "Llama",
+        "Mistral",
+        "Qwen",
+        "DeepSeek",
+        "Grok",
+        "coding agent",
+        "AI agent",
+        "agentic",
+        "agent",
+        "LangChain",
+        "Cursor",
+        "Copilot",
+        "Windsurf",
+        "Aider",
+        "Devin",
+        "code generation",
+        "MCP",
+        "Model Context Protocol",
+        "tool use",
+        "benchmark",
+        "SWE-bench",
+        "HumanEval",
+        "LiveCodeBench",
+        "leaderboard",
+        "reasoning model",
+        "context window",
+        "open weights",
+        "model release",
+    ]
+
     # OpenReview 対象学会
     # NeurIPS / ICLR / ICML は OpenReview 上に投稿を公開している（取得可能）。
     # CVPR / ICCV / ECCV は CV の主要学会だが現状は投稿を非公開（将来公開時に備えて残す）。

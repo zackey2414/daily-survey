@@ -53,6 +53,7 @@ async def generate_digest(
     industry_news: list[ArticleItem],
     community_items: list[ArticleItem],
     github_trending_items: list[ArticleItem],
+    ai_dev_items: list[ArticleItem] | None = None,
     *,
     target_date_str: str | None = None,
 ) -> str:
@@ -71,6 +72,7 @@ async def generate_digest(
         industry_news,
         community_items,
         github_trending_items,
+        ai_dev_items or [],
     )
 
     coverage_date = target_date_str or date_str
@@ -110,6 +112,7 @@ def _build_context(
     industry_news: list[ArticleItem],
     community_items: list[ArticleItem],
     github_trending_items: list[ArticleItem],
+    ai_dev_items: list[ArticleItem] | None = None,
 ) -> str:
     sections = []
 
@@ -133,6 +136,7 @@ def _build_context(
     add_section("AI 企業動向", industry_news, is_paper=False)
     add_section("SNS・コミュニティ", community_items, is_paper=False)
     add_section("GitHub Trending", github_trending_items, is_paper=False)
+    add_section("LLM・AIエージェント動向", ai_dev_items or [], is_paper=False)
 
     return "\n\n".join(sections)
 

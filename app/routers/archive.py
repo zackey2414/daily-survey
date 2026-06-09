@@ -52,6 +52,7 @@ async def archive_day(
         "industry_news",
         "community",
         "github_trending",
+        "ai_dev",
     ]:
         all_items.extend(data.get(key, []))
 
@@ -118,6 +119,7 @@ async def archive_day(
             "github_trending_by_weekly": gt_by_weekly,
             "github_trending_by_monthly": gt_by_monthly,
             "github_trending_by_total": gt_by_total,
+            "ai_dev_items": data.get("ai_dev", []),
             "available_dates": available_dates,
             "user_tags_by_id": user_tags_by_id,
         },

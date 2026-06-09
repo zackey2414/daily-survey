@@ -37,7 +37,8 @@ app/
 │       ├── industry_news.py # 海外ニュースメディア RSS + キーワードフィルタ
 │       ├── community.py     # Qiita API / Zenn RSS / Reddit JSON API
 │       ├── python_news.py   # (旧) Python 限定 GitHub Trending（後方互換用）
-│       └── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付き収集
+│       ├── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付き収集
+│       └── ai_dev.py        # LLM・AIエージェント動向（公式アップデート + 性能ニュース）
 └── templates/
     ├── base.html        # 共通レイアウト (Tailwind CDN, HTMX, Alpine.js)
     ├── pages/           # フルページテンプレート
