@@ -28,8 +28,10 @@
 | Zenn | AI・機械学習・LLM 関連記事 | RSS フィード |
 | Reddit | r/MachineLearning / r/artificial / r/LocalLLaMA | JSON API |
 | GitHub Trending | 全言語の AI/LLM 関連トレンドリポジトリ（4軸ランキング、各10件） | Web スクレイピング + GitHub REST API |
+| LLM・AIエージェント動向 | Claude Code / Codex / Cursor / Copilot 等の公式アップデート + Mistral / HuggingFace / DeepMind のモデルリリース + LLM/エージェント/コーディングAI の性能・ベンチマーク記事 | 公式 RSS/Atom + キーワードフィルタ news |
 
 > GitHub Trending の詳細は [docs/github_trending.md](docs/github_trending.md) を参照してください。
+> 「LLM・AIエージェント動向」(`ai_dev` カテゴリ) の収集元は `app/config.py` の `ai_dev_rss_feeds` / `ai_dev_news_feeds` で定義しています。
 
 ### 検索テーマ（Theme Search）
 

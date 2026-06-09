@@ -164,7 +164,8 @@ JST 12:00 (APScheduler)
     ├── collect_industry(target_date)        → 企業公式 RSS（自社発表）
     ├── collect_industry_news(target_date)   → 海外ニュース RSS（その他報道）
     ├── collect_community(target_date)       → Qiita / Zenn / Reddit
-    └── collect_github_trending(target_date)  → GitHub Trending（全言語, AI/LLMキーワードフィルタ, 3期間スクレイピング）
+    ├── collect_github_trending(target_date)  → GitHub Trending（全言語, AI/LLMキーワードフィルタ, 3期間スクレイピング）
+    └── collect_ai_dev(target_date)          → LLM・AIエージェント動向（公式アップデート + 性能ニュース）
     │
     ▼
 ② 重複除去（論文系のみ: cv / openreview / lg / ai / cl）
@@ -246,6 +247,15 @@ JST 12:00 (APScheduler)
     - description 変更あり or 30日超経過 → 新たに要約を生成
   - キーワードは `data/github_trending_keywords.json` でカスタマイズ可能（UI からも変更可能）
   - 詳細は [docs/github_trending.md](github_trending.md) を参照
+
+### 5.7 LLM・AIエージェント動向（`ai_dev`）
+
+- **公式アップデート（Pass A）**: `settings.ai_dev_rss_feeds` の RSS/Atom を並列取得
+  - Claude Code / OpenAI Codex（GitHub releases Atom）、Cursor / GitHub Copilot（changelog RSS）、Mistral / Hugging Face / Google DeepMind（blog RSS）
+  - 前日分のみ採用。バージョンタイトルが alpha/beta/rc/dev/nightly のプレリリースは除外。1ソース最大 `ai_dev_max_per_source` 件
+- **性能・ベンチマークニュース（Pass B）**: `settings.ai_dev_news_feeds`（Simon Willison / VentureBeat AI / Import AI）を取得し、`ai_dev_filter_keywords`（LLM/agent/coding-AI 関連語）でフィルタ。最大 `ai_dev_news_max_results` 件
+- 2パスを `id` で重複除去してマージ。要約は `"industry"` リテラル（定量指標を抽出）
+- 収集元は `app/config.py` で定義（環境変数ではない）。トップ/アーカイブの「LLM・AIエージェント動向」セクション（violet）に表示
 
 ---
 

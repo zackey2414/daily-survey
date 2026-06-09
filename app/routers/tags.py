@@ -34,6 +34,11 @@ CATEGORY_META = {
         "title": "GitHub Trending",
         "is_paper": False,
     },
+    "ai_dev": {
+        "icon": "🛠️",
+        "title": "LLM・AIエージェント動向",
+        "is_paper": False,
+    },
 }
 
 CATEGORY_ORDER = [
@@ -45,6 +50,7 @@ CATEGORY_ORDER = [
     "industry_news",
     "community",
     "github_trending",
+    "ai_dev",
 ]
 
 
