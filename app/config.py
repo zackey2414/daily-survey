@@ -8,8 +8,12 @@ load_dotenv()
 class Settings:
     # Gemini API
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_summary_model: str = os.getenv("GEMINI_SUMMARY_MODEL", "gemini-2.5-pro")
-    gemini_chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    # ダイジェスト（一面まとめ）生成用。flash-preview を使用
+    gemini_summary_model: str = os.getenv(
+        "GEMINI_SUMMARY_MODEL", "gemini-3-flash-preview"
+    )
+    # 個別記事要約・チャット・キーワード生成用。最安の flash-lite を使用
+    gemini_chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.1-flash-lite")
     gemini_search_threshold: float = float(os.getenv("GEMINI_SEARCH_THRESHOLD", "0.3"))
 
     # Reddit API

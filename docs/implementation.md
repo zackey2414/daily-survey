@@ -27,7 +27,7 @@
 毎日 JST 正午 (12:00) に自動実行し、前日に公開された AI 関連の論文・記事・サービス情報を収集・要約して 1 ページで閲覧できる個人向け Web アプリ。（実行時刻は arXiv の索引反映待ちのため正午。`SCHEDULE_HOUR` で変更可）
 
 ```
-収集 → 重複除去 → 要約（Gemini Pro） → JSON保存 → DB登録 → ダイジェスト生成 → メール通知
+収集 → 重複除去 → 要約（Gemini） → JSON保存 → DB登録 → ダイジェスト生成 → メール通知
 ```
 
 リモートサーバ上の Docker コンテナで動作。SSH トンネル経由で `http://localhost:8000` にアクセス。
@@ -62,7 +62,7 @@ everyday-survey/
 │   │
 │   ├── services/
 │   │   ├── pipeline.py            # 日次パイプライン統括（収集→要約→保存→通知）
-│   │   ├── summarizer.py          # Gemini Pro 要約処理
+│   │   ├── summarizer.py          # Gemini 要約処理
 │   │   ├── digest.py              # 一面まとめ生成・保存 + inject_citations
 │   │   ├── notifier.py            # SMTP メール通知
 │   │   ├── rag.py                 # チャット用 URL フェッチ・RAG コンテキスト構築
@@ -142,7 +142,7 @@ everyday-survey/
 | CSS | Tailwind CSS | CDN 経由（Play CDN） |
 | DB | SQLite | aiosqlite + SQLAlchemy async |
 | データ保存 | JSON ファイル | `data/YYYY-MM-DD/` |
-| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-2.5-flash`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-2.5-pro`（`GEMINI_SUMMARY_MODEL`）。チャットは `google-genai` SDK で Google Search グラウンディング付き |
+| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-3.1-flash-lite`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-3-flash-preview`（`GEMINI_SUMMARY_MODEL`）。チャットは `google-genai` SDK で Google Search グラウンディング付き |
 | スケジューラ | APScheduler (AsyncIOScheduler) | `Asia/Tokyo` JST 12:00 実行（arXiv 索引反映待ち） |
 | 通知 | SMTP | 収集完了時にメール送信 |
 
@@ -171,7 +171,7 @@ JST 12:00 (APScheduler)
     └── 過去の全 papers_*.json を走査して既出 ID をスキップ
     │
     ▼
-③ 並列要約 (asyncio.gather, Gemini Pro)
+③ 並列要約 (asyncio.gather, Gemini)
     ├── 論文カテゴリ: summarize_items(items, "paper")
     └── 記事カテゴリ: summarize_items(items, "article")
     │
@@ -183,7 +183,7 @@ JST 12:00 (APScheduler)
 ⑤ DB 登録（チャット機能のために Article レコードを upsert）
     │
     ▼
-⑥ ダイジェスト生成（Gemini Flash）
+⑥ ダイジェスト生成（Gemini）
     └── summaries/YYYY-MM-DD.md に保存
     │
     ▼
@@ -255,15 +255,15 @@ JST 12:00 (APScheduler)
 
 | 処理 | モジュール | モデル | 設定変数 |
 |------|-----------|--------|----------|
-| 個別記事・論文の要約 | `summarizer.py` | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` |
-| 一面まとめ生成 | `digest.py` | `gemini-2.5-pro` | `GEMINI_SUMMARY_MODEL` |
-| チャット応答 | `chat.py` | `gemini-2.5-flash` + Google Search | `GEMINI_CHAT_MODEL` |
+| 個別記事・論文の要約 | `summarizer.py` | `gemini-3.1-flash-lite` | `GEMINI_CHAT_MODEL` |
+| 一面まとめ生成 | `digest.py` | `gemini-3-flash-preview` | `GEMINI_SUMMARY_MODEL` |
+| チャット応答 | `chat.py` | `gemini-3.1-flash-lite` + Google Search | `GEMINI_CHAT_MODEL` |
 
 ### 6.1 個別記事要約
 
 `app/services/summarizer.py:summarize_items(items, category)`
 
-- モデル: `gemini-2.5-flash`（`settings.gemini_chat_model` — `.env` の `GEMINI_CHAT_MODEL`）
+- モデル: `gemini-3.1-flash-lite`（`settings.gemini_chat_model` — `.env` の `GEMINI_CHAT_MODEL`）
 - 処理: 未要約（`summarized=False`）のアイテムのみ対象
 
 ### 論文の出力フィールド（`category="paper"`）
@@ -303,7 +303,7 @@ JST 12:00 (APScheduler)
 
 `app/services/digest.py:generate_digest()`
 
-- モデル: `gemini-2.5-pro`（`settings.gemini_summary_model` — `.env` の `GEMINI_SUMMARY_MODEL`）
+- モデル: `gemini-3-flash-preview`（`settings.gemini_summary_model` — `.env` の `GEMINI_SUMMARY_MODEL`）
 - 入力: 全カテゴリの要約データ（要約テキスト + `[ref:safe_id]` 形式の引用タグ付き）
 - 出力: Markdown 形式（`summaries/YYYY-MM-DD.md`）
 
@@ -552,8 +552,8 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 | 変数名 | 説明 |
 |--------|------|
 | `GEMINI_API_KEY` | Google Gemini API キー |
-| `GEMINI_SUMMARY_MODEL` | 一面まとめ生成モデル（デフォルト: `gemini-2.5-pro`）— `digest.py` で使用 |
-| `GEMINI_CHAT_MODEL` | 個別記事要約・チャット応答モデル（デフォルト: `gemini-2.5-flash`）— `summarizer.py` / `chat.py` で使用 |
+| `GEMINI_SUMMARY_MODEL` | 一面まとめ生成モデル（デフォルト: `gemini-3-flash-preview`）— `digest.py` で使用 |
+| `GEMINI_CHAT_MODEL` | 個別記事要約・チャット応答モデル（デフォルト: `gemini-3.1-flash-lite`）— `summarizer.py` / `chat.py` で使用 |
 | `GEMINI_SEARCH_THRESHOLD` | チャット時の Google Search グラウンディング閾値（デフォルト: `0.3`、0.0=常に検索、1.0=検索しない） |
 | `SMTP_HOST` | SMTP サーバーホスト |
 | `SMTP_PORT` | SMTP ポート |
@@ -599,7 +599,7 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 
 当日のパイプライン実行結果を表示するメインページ。
 
-- **一面まとめ**: Gemini Flash で生成された Markdown 形式の日次まとめ。引用リンク `[↗]` をクリックすると対象記事カードまでスムーズスクロール
+- **一面まとめ**: Gemini で生成された Markdown 形式の日次まとめ。引用リンク `[↗]` をクリックすると対象記事カードまでスムーズスクロール
 - **記事カード**: 各カテゴリの記事をセクション・サブセクション単位で折りたたみ表示
   - 「要約を見る」で日本語要約・新規性・メタ的な学び・定量指標を展開
   - 「チャットを開く」で記事に関する AI チャットをインライン展開

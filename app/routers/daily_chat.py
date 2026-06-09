@@ -362,7 +362,7 @@ async def _generate_daily_response(
     user_message: str,
     rag_context: str,
 ) -> dict:
-    """日毎チャット用の Gemini Flash 応答生成"""
+    """日毎チャット用の Gemini 応答生成"""
     system_instruction = f"""あなたは {date_str} の AI 関連ニュース・論文全体についての質問に答える専門AIアシスタントです。
 ユーザーの質問には、以下に示すその日の全記事コンテキストを根拠にして日本語で回答してください。
 コンテキストに記載のない概念・背景知識・最新情報について質問された場合は、Google検索ツールを使って正確な情報を取得してから回答してください。

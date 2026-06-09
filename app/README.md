@@ -69,8 +69,8 @@ app/
 | 環境変数 | デフォルト | 説明 |
 |---------|-----------|------|
 | `GEMINI_API_KEY` | (必須) | Gemini API キー |
-| `GEMINI_SUMMARY_MODEL` | `gemini-2.5-pro` | ダイジェスト生成用モデル |
-| `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | チャット・個別要約用モデル |
+| `GEMINI_SUMMARY_MODEL` | `gemini-3-flash-preview` | ダイジェスト生成用モデル |
+| `GEMINI_CHAT_MODEL` | `gemini-3.1-flash-lite` | チャット・個別要約用モデル |
 | `GEMINI_SEARCH_THRESHOLD` | `0.3` | チャット時の Google Search グラウンディング閾値 (0.0=常に検索, 1.0=検索しない) |
 | `GITHUB_TOKEN` | (空) | GitHub API トークン（任意）。設定するとレートリミット 60→5000 req/h に緩和 |
 | `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `12` / `0` | 日次パイプライン実行時刻 (JST)。arXiv 索引反映待ちのため正午 |
@@ -100,7 +100,7 @@ app/
 1. **セッション管理**: 記事ごとにセッションを作成・切り替え・削除
 2. **RAG コンテキスト構築**: 初回メッセージ時に記事本文を取得しセッションにキャッシュ
 3. **応答生成** (`_generate_response`):
-   - Gemini Flash にシステム指示 + RAG コンテキスト + 会話履歴を渡す
+   - Gemini にシステム指示 + RAG コンテキスト + 会話履歴を渡す
    - `google_search_retrieval` ツールを付与し、Gemini が必要と判断した場合に Google 検索を実行
    - レスポンスの `grounding_metadata` から検索ソースを抽出
 4. **DB 保存**: メッセージ本文に加え `used_search` / `search_sources` を永続化

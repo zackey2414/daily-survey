@@ -21,8 +21,8 @@ cp .env.example .env
 | 変数名 | デフォルト | 変更必要度 | 説明 |
 |--------|-----------|-----------|------|
 | `GEMINI_API_KEY` | `your_gemini_api_key_here` | **必須** | Gemini API キー。[Google AI Studio](https://aistudio.google.com/apikey) で取得する。全ての LLM 機能（要約・チャット・ダイジェスト生成）に使用される |
-| `GEMINI_SUMMARY_MODEL` | `gemini-2.5-pro` | 原則そのまま | ダイジェスト（一面まとめ）生成に使用するモデル。Pro は精度重視の用途に使っている |
-| `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | 原則そのまま | 個別記事の要約・チャット応答・タイトル生成に使用するモデル。Flash は速度・コスト重視の用途に使っている |
+| `GEMINI_SUMMARY_MODEL` | `gemini-3-flash-preview` | 原則そのまま | ダイジェスト（一面まとめ）生成に使用するモデル。全カテゴリを俯瞰する品質重視のため、個別要約より高性能なモデルを使う |
+| `GEMINI_CHAT_MODEL` | `gemini-3.1-flash-lite` | 原則そのまま | 個別記事の要約・チャット応答・タイトル生成・テーマキーワード生成に使用するモデル。件数が多いためトークン単価が最も安い flash-lite を使う |
 | `GEMINI_SEARCH_THRESHOLD` | `0.3` | 任意 | チャット時の Google Search グラウンディング閾値。`0.0` で常に検索、`1.0` で検索しない。低いほど検索が発動しやすくなるが、API コストが増加する |
 
 ### Reddit API

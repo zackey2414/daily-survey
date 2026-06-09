@@ -1,6 +1,6 @@
 """
 Gemini API を使った要約処理モジュール
-個別記事・論文の要約には gemini-2.5-flash を使用する（一面まとめは digest.py で gemini-2.5-pro を使用）
+個別記事・論文の要約には gemini-3.1-flash-lite を使用する（一面まとめは digest.py で gemini-3-flash-preview を使用）
 プロンプトテンプレートは prompts/ ディレクトリの .md ファイルから読み込む
 """
 
@@ -46,7 +46,7 @@ async def summarize_item(
     item: ArticleItem,
     category: Literal["paper", "article", "industry"],
 ) -> ArticleItem:
-    """1 件のアイテムを Gemini Pro で要約する（非同期・スレッドプール経由）"""
+    """1 件のアイテムを Gemini で要約する（非同期・スレッドプール経由）"""
     if item.summarized:
         return item
 
