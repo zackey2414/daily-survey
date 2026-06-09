@@ -19,18 +19,17 @@ OPENREVIEW_API_URL = "https://api2.openreview.net/notes"
 JST = timezone(timedelta(hours=9))
 
 # 短縮名 → invitation テンプレート（{year} は動的置換）
-# OpenReview API v2 では `content.venue` ではなく `invitation` で学会を絞り込む
+# OpenReview API v2 では `content.venue` ではなく `invitation` で学会を絞り込む。
+# NeurIPS / ICLR / ICML は公開投稿あり。CVPR / ICCV / ECCV は現状非公開だが正しい
+# プレフィックス（thecvf.com/<venue>/...）にしておく（将来公開時に取得できるよう）。
+# ICLR は旧 "Blind_Submission" が廃止され現在は "Submission"。
 VENUE_INVITATIONS: dict[str, str] = {
-    "ICLR": "ICLR.cc/{year}/Conference/-/Blind_Submission",
+    "ICLR": "ICLR.cc/{year}/Conference/-/Submission",
     "NeurIPS": "NeurIPS.cc/{year}/Conference/-/Submission",
     "ICML": "ICML.cc/{year}/Conference/-/Submission",
-    "CVPR": "CVPR.thecvf.com/{year}/Conference/-/Submission",
-    "ICCV": "ICCV.thecvf.com/{year}/Conference/-/Submission",
-    "ECCV": "ECCV/{year}/Conference/-/Submission",
-    "AAAI": "AAAI.org/{year}/Conference/-/Submission",
-    "ACL": "aclweb.org/ACL/{year}/Conference/-/Submission",
-    "EMNLP": "EMNLP/{year}/Conference/-/Submission",
-    "IJCAI": "IJCAI.org/{year}/Conference/-/Submission",
+    "CVPR": "thecvf.com/CVPR/{year}/Conference/-/Submission",
+    "ICCV": "thecvf.com/ICCV/{year}/Conference/-/Submission",
+    "ECCV": "thecvf.com/ECCV/{year}/Conference/-/Submission",
 }
 
 # CV / LLM / VLM 関連キーワード（タイトル・アブストラクト照合）

@@ -2,8 +2,8 @@
 
 LLM 要約の出力フォーマット仕様。`app/services/summarizer.py` の `_build_prompt()` で使用するプロンプトの構造定義。
 
-使用モデル: **`gemini-2.5-flash`**（個別記事・論文の要約。件数が多く高速処理を優先）
-※ 一面まとめ生成（`digest.py`）は **`gemini-2.5-pro`** を使用する。
+使用モデル: **`gemini-3.1-flash-lite`**（個別記事・論文の要約。件数が多く高速処理を優先）
+※ 一面まとめ生成（`digest.py`）は **`gemini-3-flash-preview`** を使用する。
 
 ---
 

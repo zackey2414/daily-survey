@@ -8,7 +8,7 @@
 - Backend: Python 3.12 + FastAPI
 - Frontend: Jinja2 + HTMX + Alpine.js + Tailwind CSS (CDN)
 - DB: SQLite (aiosqlite + SQLAlchemy async) — チャット履歴・ユーザータグのみ
-- LLM: Google Gemini API (要約: gemini-2.5-pro、チャット: gemini-2.5-flash)
+- LLM: Google Gemini API (要約: gemini-3-flash-preview、チャット: gemini-3.1-flash-lite)
 - Container: Docker + uv
 
 # 重要な実装ルール

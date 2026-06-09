@@ -8,8 +8,12 @@ load_dotenv()
 class Settings:
     # Gemini API
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_summary_model: str = os.getenv("GEMINI_SUMMARY_MODEL", "gemini-2.5-pro")
-    gemini_chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    # ダイジェスト（一面まとめ）生成用。flash-preview を使用
+    gemini_summary_model: str = os.getenv(
+        "GEMINI_SUMMARY_MODEL", "gemini-3-flash-preview"
+    )
+    # 個別記事要約・チャット・キーワード生成用。最安の flash-lite を使用
+    gemini_chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.1-flash-lite")
     gemini_search_threshold: float = float(os.getenv("GEMINI_SEARCH_THRESHOLD", "0.3"))
 
     # Reddit API
@@ -29,7 +33,10 @@ class Settings:
     smtp_to: str = os.getenv("SMTP_TO", "")
 
     # スケジューラ
-    schedule_hour: int = int(os.getenv("SCHEDULE_HOUR", "9"))
+    # 12:00 JST (= 03:00 UTC) 実行。arXiv の announcement は約 00:00 UTC で、
+    # submittedDate インデックス反映に時間がかかるため、9時(=00:00 UTC)実行だと
+    # 当日分が 0 件になりやすい。3時間後の正午にずらして索引反映を待つ。
+    schedule_hour: int = int(os.getenv("SCHEDULE_HOUR", "12"))
     schedule_minute: int = int(os.getenv("SCHEDULE_MINUTE", "0"))
 
     # ディレクトリ
@@ -124,17 +131,66 @@ class Settings:
     ]
 
     # OpenReview 対象学会
+    # NeurIPS / ICLR / ICML は OpenReview 上に投稿を公開している（取得可能）。
+    # CVPR / ICCV / ECCV は CV の主要学会だが現状は投稿を非公開（将来公開時に備えて残す）。
+    # AAAI / ACL / EMNLP / IJCAI は OpenReview 上に公開投稿が無く常に 0 件のため除外。
     openreview_venues: list[str] = [
-        "CVPR",
         "NeurIPS",
         "ICLR",
-        "ICCV",
         "ICML",
-        "AAAI",
-        "ACL",
+        "CVPR",
+        "ICCV",
         "ECCV",
-        "EMNLP",
-        "IJCAI",
+    ]
+
+    # 検索テーマのデフォルト（初回起動時に data/themes.json へ投入される）
+    # data/ は gitignore 対象のため、シード定義はコード側 (config) に置く。
+    # キーワードは静的定義（起動時に外部 API へ依存しない）。後から UI で編集可能。
+    default_themes: list[dict] = [
+        {
+            "name": "画像検索",
+            "keywords": [
+                "image retrieval",
+                "image search",
+                "content-based image retrieval",
+                "content-based retrieval",
+                "visual search",
+                "image-to-image retrieval",
+                "video retrieval",
+                "cross-modal retrieval",
+                "instance retrieval",
+            ],
+        },
+        {
+            "name": "物体中心画像検索",
+            "keywords": [
+                "object-centric",
+                "object-centric retrieval",
+                "object-centric image retrieval",
+                "object-centric learning",
+                "object retrieval",
+                "object-level retrieval",
+                "instance retrieval",
+                "compositional retrieval",
+            ],
+        },
+        {
+            "name": "エッジクラウド協調AI",
+            "keywords": [
+                "edge-cloud",
+                "edge computing",
+                "cloud-edge",
+                "edge-cloud collaboration",
+                "collaborative inference",
+                "split computing",
+                "split inference",
+                "on-device inference",
+                "edge AI",
+                "edge intelligence",
+                "model partitioning",
+                "device-edge-cloud",
+            ],
+        },
     ]
 
     # Reddit 対象サブレディット

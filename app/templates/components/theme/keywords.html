@@ -1,0 +1,19 @@
+<!--
+  テーマ別キーワードチップ (keywords.html)
+  必要変数: theme (Theme)
+  #theme-keywords-{theme.id} の innerHTML として swap される
+-->
+<div class="flex flex-wrap gap-1.5">
+  {% for kw in theme.keywords %}
+  <span class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 px-2.5 py-1 rounded-full">
+    {{ kw }}
+    <button hx-delete="/admin/themes/{{ theme.id }}/keywords/{{ loop.index0 }}"
+            hx-target="#theme-keywords-{{ theme.id }}"
+            hx-swap="innerHTML"
+            class="text-indigo-400 hover:text-red-500 ml-0.5 font-bold leading-none">×</button>
+  </span>
+  {% endfor %}
+  {% if not theme.keywords %}
+  <span class="text-xs text-gray-400">キーワードがありません</span>
+  {% endif %}
+</div>

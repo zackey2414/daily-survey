@@ -10,7 +10,7 @@ app/
 ├── config.py            # 全設定 (環境変数 → Settings クラス)
 ├── schemas.py           # Pydantic モデル (ArticleItem, DailyCollection)
 ├── jinja.py             # Jinja2Templates シングルトン + カスタムフィルター
-├── scheduler.py         # APScheduler (毎日 JST 09:00 にパイプライン実行)
+├── scheduler.py         # APScheduler (毎日 JST 12:00 にパイプライン実行)
 ├── db/
 │   ├── database.py      # SQLAlchemy async エンジン, init_db(), migrate_db()
 │   └── models.py        # ORM モデル (Article, ChatSession, ChatMessage, UserTag)
@@ -20,10 +20,13 @@ app/
 │   ├── summaries.py     # GET /summaries, /summaries/{date} — サマリー閲覧
 │   ├── tags.py          # GET /tags/, /tags/{name} — タグ一覧・タグ別記事
 │   ├── user_tags.py     # POST/DELETE /user-tags/ — ユーザータグ CRUD (HTMX)
+│   ├── themes.py        # GET /themes, /themes/{id} + /admin/themes/* — 検索テーマ管理・オンデマンド検索 (HTMX)
 │   └── chat.py          # チャット機能 (セッション管理, メッセージ送受信, RAG + Google Search)
 ├── services/
-│   ├── pipeline.py      # 日次パイプライン統括 (収集 → 要約 → ダイジェスト → 通知)
+│   ├── pipeline.py      # 日次パイプライン統括 (収集 → 要約 → テーマ検索 → ダイジェスト → 通知)
 │   ├── summarizer.py    # Gemini による個別記事要約 (paper / industry / article)
+│   ├── themes.py        # 検索テーマのレジストリ (data/themes.json) + Gemini キーワード生成
+│   ├── theme_search.py  # テーマのハイブリッド収集 (arXiv 専用検索 + 収集済みアイテムのフィルタ)
 │   ├── digest.py        # 一面まとめ (ダイジェスト) 生成・Markdown 保存
 │   ├── rag.py           # RAG コンテキスト構築 (URL フェッチ, チャンク分割, Jaccard スコアリング)
 │   ├── notifier.py      # SMTP メール通知
@@ -44,6 +47,8 @@ app/
     │   ├── tags.html
     │   ├── tags_list.html
     │   ├── chat_search.html
+    │   ├── themes_list.html    # 検索テーマ一覧 + 管理 UI
+    │   ├── theme_detail.html   # テーマ別の収集結果 (日付横断)
     │   └── error.html
     └── components/      # HTMX swap 用部分テンプレート
         ├── article/     # 記事カード・要約表示
@@ -51,6 +56,7 @@ app/
         │   ├── panel.html
         │   ├── messages.html
         │   └── message_item.html
+        ├── theme/       # テーマ管理カード・キーワードチップ (HTMX フラグメント)
         └── tags/        # タグ管理 UI
 ```
 
@@ -63,11 +69,11 @@ app/
 | 環境変数 | デフォルト | 説明 |
 |---------|-----------|------|
 | `GEMINI_API_KEY` | (必須) | Gemini API キー |
-| `GEMINI_SUMMARY_MODEL` | `gemini-2.5-pro` | ダイジェスト生成用モデル |
-| `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | チャット・個別要約用モデル |
+| `GEMINI_SUMMARY_MODEL` | `gemini-3-flash-preview` | ダイジェスト生成用モデル |
+| `GEMINI_CHAT_MODEL` | `gemini-3.1-flash-lite` | チャット・個別要約用モデル |
 | `GEMINI_SEARCH_THRESHOLD` | `0.3` | チャット時の Google Search グラウンディング閾値 (0.0=常に検索, 1.0=検索しない) |
 | `GITHUB_TOKEN` | (空) | GitHub API トークン（任意）。設定するとレートリミット 60→5000 req/h に緩和 |
-| `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `9` / `0` | 日次パイプライン実行時刻 (JST) |
+| `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `12` / `0` | 日次パイプライン実行時刻 (JST)。arXiv 索引反映待ちのため正午 |
 
 ### `db/models.py`
 
@@ -94,7 +100,7 @@ app/
 1. **セッション管理**: 記事ごとにセッションを作成・切り替え・削除
 2. **RAG コンテキスト構築**: 初回メッセージ時に記事本文を取得しセッションにキャッシュ
 3. **応答生成** (`_generate_response`):
-   - Gemini Flash にシステム指示 + RAG コンテキスト + 会話履歴を渡す
+   - Gemini にシステム指示 + RAG コンテキスト + 会話履歴を渡す
    - `google_search_retrieval` ツールを付与し、Gemini が必要と判断した場合に Google 検索を実行
    - レスポンスの `grounding_metadata` から検索ソースを抽出
 4. **DB 保存**: メッセージ本文に加え `used_search` / `search_sources` を永続化
@@ -115,8 +121,9 @@ RAG コンテキスト構築の流れ:
 1. 全カテゴリの記事を並列収集 (`collector/*`)
 2. 収集結果を JSON 保存 + 重複除去
 3. 未要約アイテムを Gemini で要約 (`summarizer.py`)
-4. 全カテゴリ横断の一面まとめを生成 (`digest.py`)
-5. メール通知 (`notifier.py`)
+4. 有効な検索テーマごとに該当論文・記事を収集・保存 (`theme_search.py`)
+5. 全カテゴリ横断の一面まとめを生成 (`digest.py`)
+6. メール通知 (`notifier.py`)
 
 ### `db/database.py` マイグレーション
 

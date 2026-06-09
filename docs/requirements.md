@@ -91,7 +91,7 @@
 | データベース | **SQLite** | チャット履歴のみ |
 | データ保存 | **JSON ファイル** | 日次収集データ（再利用性重視） |
 | サマリー保存 | **Markdown ファイル** | 日次一面まとめ |
-| LLM API | **Google Gemini API** | 個別記事要約・チャット: `gemini-2.5-flash`、一面まとめ生成: `gemini-2.5-pro`。チャットは Google Search グラウンディング付き |
+| LLM API | **Google Gemini API** | 個別記事要約・チャット: `gemini-3.1-flash-lite`、一面まとめ生成: `gemini-3-flash-preview`。チャットは Google Search グラウンディング付き |
 | スケジューラ | **APScheduler**（FastAPI 組み込み）または **cron**（Docker 内） | JST 09:00 実行 |
 | 通知 | SMTP（メール） | 収集完了時 |
 
@@ -99,9 +99,9 @@
 
 | 用途 | モデル | 設定変数 | 理由 |
 |------|--------|----------|------|
-| 個別記事・論文の要約 | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` | 件数が多く高速処理を優先 |
-| 一面まとめ生成（日次ダイジェスト） | `gemini-2.5-pro` | `GEMINI_SUMMARY_MODEL` | 全体を見渡す高品質な要約が必要 |
-| チャット応答 | `gemini-2.5-flash` | `GEMINI_CHAT_MODEL` | 対話的応答はコスト・速度を優先。Google Search グラウンディング付き |
+| 個別記事・論文の要約 | `gemini-3.1-flash-lite` | `GEMINI_CHAT_MODEL` | 件数が多く高速処理を優先 |
+| 一面まとめ生成（日次ダイジェスト） | `gemini-3-flash-preview` | `GEMINI_SUMMARY_MODEL` | 全体を見渡す高品質な要約が必要 |
+| チャット応答 | `gemini-3.1-flash-lite` | `GEMINI_CHAT_MODEL` | 対話的応答はコスト・速度を優先。Google Search グラウンディング付き |
 
 - モデル名は設定ファイル（`.env`）で個別に切り替え可能
 - チャット応答は `google-genai` SDK を使用し、RAG コンテキストで不足する場合に Gemini が自動で Google 検索を実行する
@@ -211,7 +211,7 @@
 
 #### 3.2.1 個別記事の要約
 
-- 使用モデル: Gemini API（`gemini-2.5-flash`）— 件数が多く高速処理を優先
+- 使用モデル: Gemini API（`gemini-3.1-flash-lite`）— 件数が多く高速処理を優先
 - 出力言語: **日本語**
 - 論文（arXiv / OpenReview）の場合に含める内容:
   - 研究概要（何をしたか）
@@ -231,7 +231,7 @@
 #### 3.2.2 一面まとめ生成（新聞一面）
 
 - トリガー: 全カテゴリの収集・要約完了後に自動生成
-- 使用モデル: Gemini API（`gemini-2.5-pro`）— 全カテゴリを俯瞰する高品質な要約が必要
+- 使用モデル: Gemini API（`gemini-3-flash-preview`）— 全カテゴリを俯瞰する高品質な要約が必要
 - 入力: 全カテゴリの要約データ（JSON）
 - 出力形式: **Markdown**（`summaries/YYYY-MM-DD.md`）
 - 出力内容:

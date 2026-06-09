@@ -26,6 +26,12 @@ JST = timezone(timedelta(hours=9))
 ArxivCategory = Literal["cs.CV", "cs.LG", "cs.AI", "cs.CL"]
 
 
+# 0件時に遡及を段階的に拡大するフォールバック日数（索引反映遅延・低調日・週末対策）
+_FALLBACK_LOOKBACKS = (3, 7)
+_FALLBACK_DELAY = 8  # フォールバック再取得の前に待機する秒数（連続リクエスト回避）
+_MAX_RETRIES = 5
+
+
 async def collect_arxiv(
     category: ArxivCategory,
     target_date: date | None = None,
@@ -36,8 +42,10 @@ async def collect_arxiv(
     """
     指定カテゴリの arXiv 論文を収集する。
 
-    target_date (JST 前日) の 00:00〜23:59 JST に投稿された論文のみを返す。
-    UTC 換算: (target_date - 1日) 15:00:00 〜 target_date 14:59:59
+    通常は target_date (JST 前日) 当日に投稿された論文を返す。
+    0 件だった場合（arXiv の submittedDate インデックス反映遅延・低調日・週末など）は
+    遡及日数を段階的に広げて再取得し、空の日を極力作らない。重複は呼び出し側の
+    seen_ids で除去される前提。
 
     client を渡すと既存の httpx.AsyncClient を再利用する（直列収集向け）。
     """
@@ -46,15 +54,44 @@ async def collect_arxiv(
     if max_results is None:
         max_results = settings.arxiv_max_results
 
-    # JST 前日 00:00〜23:59 = UTC (target_date-1) 15:00 〜 target_date 14:59
-    # 月曜日の場合、金曜〜月曜の投稿を含むため submittedDate を金曜まで遡る
-    if target_date.weekday() == 0:  # Monday
-        lookback_days = 3  # 金曜まで遡る
-    else:
-        lookback_days = 1
-    from_str = (target_date - timedelta(days=lookback_days)).strftime(
-        "%Y%m%d"
-    ) + "150000"
+    logger.info(f"arXiv 収集開始: {category} / 対象日(JST): {target_date}")
+
+    # 通常ウィンドウ: target 当日分
+    items = await _query_arxiv(
+        category, target_date, target_date, max_results, client=client
+    )
+
+    # 0件フォールバック: 遡及を段階的に拡大
+    if not items:
+        for fb in _FALLBACK_LOOKBACKS:
+            await asyncio.sleep(_FALLBACK_DELAY)  # 連続リクエストを避けレート制限に配慮
+            earliest = target_date - timedelta(days=fb)
+            logger.warning(
+                f"arXiv {category}: 0件のため遡及 {fb} 日 "
+                f"({earliest}〜{target_date}) に拡大して再取得"
+            )
+            items = await _query_arxiv(
+                category, earliest, target_date, max_results, client=client
+            )
+            if items:
+                break
+
+    logger.info(f"arXiv 収集完了: {category} / {len(items)} 件")
+    return items
+
+
+async def _query_arxiv(
+    category: str,
+    earliest_date: date,
+    target_date: date,
+    max_results: int,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> list[ArticleItem]:
+    """submittedDate ウィンドウ [earliest_date, target_date] を検索し、その範囲に
+    JST 公開された論文を返す。"""
+    # JST earliest_date 00:00 = UTC (earliest_date-1) 15:00 / JST target 23:59 = UTC target 14:59
+    from_str = (earliest_date - timedelta(days=1)).strftime("%Y%m%d") + "150000"
     to_str = target_date.strftime("%Y%m%d") + "145959"
 
     params: dict[str, Any] = {
@@ -65,65 +102,74 @@ async def collect_arxiv(
         "start": 0,
     }
 
-    logger.info(
-        f"arXiv 収集開始: {category} / 対象日(JST): {target_date} "
-        f"(UTC: {from_str} 〜 {to_str})"
-    )
-
-    max_retries = 5
-    resp = None
-
-    async def _fetch(c: httpx.AsyncClient) -> httpx.Response | None:
-        nonlocal resp
-        for attempt in range(max_retries):
-            try:
-                resp = await c.get(ARXIV_API_URL, params=params)
-                resp.raise_for_status()
-                return resp
-            except httpx.HTTPStatusError as e:
-                status = e.response.status_code
-                retryable = status == 429 or status >= 500
-                if attempt < max_retries - 1 and retryable:
-                    # Retry-After ヘッダがあればそれを尊重、なければ指数バックオフ
-                    retry_after = e.response.headers.get("Retry-After")
-                    if retry_after and retry_after.isdigit():
-                        wait = int(retry_after) + 5  # 余裕を持たせる
-                    else:
-                        wait = 15 * (2**attempt)  # 15s, 30s, 60s, 120s
-                    logger.warning(
-                        f"arXiv API {status} ({category}): "
-                        f"{wait}秒後にリトライ (試行 {attempt + 1}/{max_retries})"
-                    )
-                    await asyncio.sleep(wait)
-                    continue
-                logger.error(f"arXiv API エラー ({category}): {e}")
-                return None
-            except httpx.HTTPError as e:
-                logger.error(f"arXiv API エラー ({category}): {e}")
-                return None
-        return None
-
     if client is not None:
-        result = await _fetch(client)
+        text = await _fetch_with_retry(category, params, client)
     else:
         async with httpx.AsyncClient(timeout=90.0) as c:
-            result = await _fetch(c)
+            text = await _fetch_with_retry(category, params, c)
 
-    if result is None:
+    if text is None:
         return []
+    return _parse_arxiv_xml(text, category, earliest_date, target_date)[:max_results]
 
-    items = _parse_arxiv_xml(result.text, category, target_date)
-    items = items[:max_results]
-    logger.info(f"arXiv 収集完了: {category} / {len(items)} 件")
-    return items
+
+async def _fetch_with_retry(
+    category: str, params: dict[str, Any], client: httpx.AsyncClient
+) -> str | None:
+    """arXiv API をリトライ付きで取得し XML テキストを返す。
+
+    429/5xx に加えてタイムアウト・接続エラー（TransportError）もリトライ対象とする。
+    """
+    for attempt in range(_MAX_RETRIES):
+        try:
+            resp = await client.get(ARXIV_API_URL, params=params)
+            resp.raise_for_status()
+            return resp.text
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if attempt < _MAX_RETRIES - 1 and (status == 429 or status >= 500):
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    wait = int(retry_after) + 5
+                else:
+                    wait = 15 * (2**attempt)  # 15s, 30s, 60s, 120s
+                logger.warning(
+                    f"arXiv API {status} ({category}): "
+                    f"{wait}秒後にリトライ (試行 {attempt + 1}/{_MAX_RETRIES})"
+                )
+                await asyncio.sleep(wait)
+                continue
+            logger.error(f"arXiv API エラー ({category}): {e}")
+            return None
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            # ネットワーク/タイムアウト系は一時障害としてリトライ
+            if attempt < _MAX_RETRIES - 1:
+                wait = 10 * (2**attempt)  # 10s, 20s, 40s, 80s
+                logger.warning(
+                    f"arXiv API 通信エラー ({category}): {e} "
+                    f"{wait}秒後にリトライ (試行 {attempt + 1}/{_MAX_RETRIES})"
+                )
+                await asyncio.sleep(wait)
+                continue
+            logger.error(f"arXiv API 通信エラー ({category}): {e}")
+            return None
+        except httpx.HTTPError as e:
+            logger.error(f"arXiv API エラー ({category}): {e}")
+            return None
+    return None
 
 
 def _parse_arxiv_xml(
     xml_text: str,
     category: str,
+    earliest_date: date,
     target_date: date,
 ) -> list[ArticleItem]:
-    root = ET.fromstring(xml_text)
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as e:
+        logger.error(f"arXiv XML パース失敗 ({category}): {e}")
+        return []
     items: list[ArticleItem] = []
 
     for entry in root.findall("atom:entry", NS):
@@ -138,7 +184,8 @@ def _parse_arxiv_xml(
         except ValueError:
             continue
 
-        if pub_jst_date != target_date:
+        # 公開日が [earliest_date, target_date] の範囲外なら除外
+        if not (earliest_date <= pub_jst_date <= target_date):
             continue
 
         arxiv_id_raw = entry.findtext("atom:id", "", NS)
@@ -178,24 +225,14 @@ def _parse_arxiv_xml(
 
 
 def _cv_priority_score(item: ArticleItem) -> int:
-    """CS.CV 論文のトピック優先度スコア（小さいほど優先表示）"""
+    """CS.CV 論文のトピック優先度スコア（小さいほど優先表示）。
+
+    特定トピック（画像検索・物体中心画像検索など）の優先付けは「検索テーマ」機構
+    （app/services/theme_search.py）に一本化したため、ここでは一般的な CV タスクを
+    その他の cs.CV より前に出す軽いランキングのみを行う。
+    """
     text = (item.title_en + " " + item.abstract_en[:300]).lower()
-    # 優先度 1: 画像検索・物体中心画像検索・動画サンプリング
-    if any(
-        kw in text
-        for kw in [
-            "image retrieval",
-            "image search",
-            "object-centric",
-            "video sampling",
-            "temporal sampling",
-            "frame sampling",
-            "video retrieval",
-            "content-based retrieval",
-        ]
-    ):
-        return 0
-    # 優先度 2: 動画像分類・物体検知・セグメンテーション・認識
+    # 優先度 0: 動画像分類・物体検知・セグメンテーション・認識など主要 CV タスク
     if any(
         kw in text
         for kw in [
@@ -210,9 +247,9 @@ def _cv_priority_score(item: ArticleItem) -> int:
             "pose estimation",
         ]
     ):
-        return 1
-    # 優先度 3: その他 cs.CV
-    return 2
+        return 0
+    # 優先度 1: その他 cs.CV
+    return 1
 
 
 async def collect_arxiv_cv(
@@ -225,7 +262,8 @@ async def collect_arxiv_cv(
     cs.CV 論文をトピック優先度付きで収集する（最大 max_results 件）。
 
     多めに取得してから優先度でソートし上位 max_results 件を返す。
-    優先度: 画像検索系 > 分類・検知・セグメンテーション > その他 CV
+    優先度: 主要 CV タスク（分類・検知・セグメンテーション等） > その他 CV。
+    特定の研究テーマ（画像検索など）は検索テーマ機構で別途横断収集される。
     """
     raw = await collect_arxiv(
         "cs.CV", target_date, max_results=max_results * 2, client=client

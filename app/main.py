@@ -12,7 +12,16 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.db.database import init_db, migrate_db
 from app.jinja import templates
-from app.routers import archive, chat, daily_chat, main_page, summaries, tags, user_tags
+from app.routers import (
+    archive,
+    chat,
+    daily_chat,
+    main_page,
+    summaries,
+    tags,
+    themes,
+    user_tags,
+)
 from app.scheduler import start_scheduler, stop_scheduler
 
 # ログ設定
@@ -40,6 +49,15 @@ async def lifespan(app: FastAPI):
 
     await init_db()
     await migrate_db()
+
+    # デフォルト検索テーマを初回投入（themes.json が無ければ）
+    from app.services.themes import ensure_default_themes
+
+    try:
+        ensure_default_themes()
+    except Exception as e:
+        logger.warning(f"デフォルトテーマ投入をスキップ: {e}")
+
     start_scheduler()
     logger.info("AI Daily Survey 起動完了")
     yield
@@ -62,6 +80,7 @@ app.include_router(archive.router)
 app.include_router(summaries.router)
 app.include_router(chat.router)
 app.include_router(daily_chat.router)
+app.include_router(themes.router)
 app.include_router(user_tags.router)
 
 # 静的ファイル配信
@@ -76,7 +95,6 @@ async def manual_run_pipeline(request: Request, date_str: str | None = None):
     date_str: 収集日（YYYY-MM-DD）。省略時は今日の日付。
     HTMX から hx-vals で送信される場合はフォームデータから取得。
     """
-    import asyncio
     from datetime import date, timedelta, datetime
     import pytz
     from app.services.pipeline import run_daily_pipeline
@@ -100,7 +118,12 @@ async def manual_run_pipeline(request: Request, date_str: str | None = None):
         collection_date = datetime.now(JST).date()
 
     target_date = collection_date - timedelta(days=1)
-    asyncio.create_task(run_daily_pipeline(collection_date))
+    from app.services.tasks import spawn
+
+    spawn(
+        run_daily_pipeline(collection_date),
+        name=f"run-pipeline:{collection_date.isoformat()}",
+    )
 
     msg = (
         f"収集日 {collection_date.isoformat()} / 対象日 {target_date.isoformat()} "
@@ -149,7 +172,9 @@ async def reprocess_summaries(date_str: str | None = None):
             _save_collection(date_str, target_date_str, cat, items)
         return sum(len(r) for r in results)
 
-    asyncio.create_task(_run())
+    from app.services.tasks import spawn
+
+    spawn(_run(), name=f"reprocess-summaries:{date_str}")
     return {"message": f"{date_str} の再要約を開始しました（バックグラウンド実行）"}
 
 

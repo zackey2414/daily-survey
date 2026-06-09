@@ -1,6 +1,6 @@
 """
 APScheduler による定期実行スケジューラ
-毎日 JST 09:00 に日次パイプラインを実行する
+既定では毎日 JST 12:00（SCHEDULE_HOUR/SCHEDULE_MINUTE で変更可）に日次パイプラインを実行する
 """
 
 import logging

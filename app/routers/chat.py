@@ -464,7 +464,7 @@ async def _generate_response(
     rag_context: str,
 ) -> dict:
     """
-    Gemini Flash を使ってチャット応答を生成する。
+    Gemini を使ってチャット応答を生成する。
     Google Search グラウンディング付き (google-genai SDK)。
 
     Returns:
