@@ -100,15 +100,12 @@ async def get_latest_session(
     session = result.scalar_one_or_none()
 
     if session is None:
-        session = ChatSession(date=date_str, title="新しいチャット")
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
-        messages: list[ChatMessage] = []
-    else:
-        messages = session.messages
+        # セッションがない場合は空パネルを表示（セッションは初回メッセージ時に作成）
+        return await _render_daily_chat_panel(request, date_str, None, [], db)
 
-    return await _render_daily_chat_panel(request, date_str, session, messages, db)
+    return await _render_daily_chat_panel(
+        request, date_str, session, session.messages, db
+    )
 
 
 # ── セッション作成 ─────────────────────────────────────────────────
@@ -136,6 +133,62 @@ async def create_session(
     await db.commit()
     await db.refresh(session)
     return await _render_daily_chat_panel(request, date_str, session, [], db)
+
+
+# ── 初回メッセージ（セッション作成 + メッセージ送信） ─────────────────
+@router.post("/{date_str}/first-message", response_class=HTMLResponse)
+async def first_message(
+    request: Request,
+    date_str: str,
+    message: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """セッションがない状態から初回メッセージを送信する。
+    セッション作成 → メッセージ送信 → パネル全体を返す。"""
+    session = ChatSession(date=date_str, title="新しいチャット")
+    db.add(session)
+    await db.flush()
+
+    # ユーザーメッセージを保存
+    user_msg = ChatMessage(session_id=session.id, role="user", content=message)
+    db.add(user_msg)
+    await db.flush()
+
+    # RAG コンテキストを構築
+    rag_context = await asyncio.get_event_loop().run_in_executor(
+        None, _build_daily_rag_context, date_str
+    )
+    session.rag_context = rag_context
+
+    # AI 応答を生成
+    gen_result = await _generate_daily_response(
+        date_str, [user_msg], message, rag_context
+    )
+
+    # AI メッセージを保存
+    ai_msg = ChatMessage(
+        session_id=session.id,
+        role="assistant",
+        content=gen_result["text"],
+        used_search=gen_result["used_search"],
+        search_sources=(
+            json.dumps(gen_result["sources"], ensure_ascii=False)
+            if gen_result["sources"]
+            else None
+        ),
+    )
+    db.add(ai_msg)
+
+    # タイトルを自動生成
+    session.title = await _generate_title(message)
+
+    await db.commit()
+    await db.refresh(session, attribute_names=["id"])
+
+    # パネル全体を返す（セッション情報 + メッセージ付き）
+    return await _render_daily_chat_panel(
+        request, date_str, session, [user_msg, ai_msg], db
+    )
 
 
 # ── セッション読み込み ─────────────────────────────────────────────
@@ -222,15 +275,21 @@ async def send_message(
     db.add(ai_msg)
 
     # 初回メッセージのときセッションタイトルを自動生成
+    new_title = None
     if len(session.messages) == 0:
-        session.title = await _generate_title(message)
+        new_title = await _generate_title(message)
+        session.title = new_title
 
     await db.commit()
 
-    return templates.TemplateResponse(
-        "components/chat/messages.html",
-        {"request": request, "messages": [ai_msg]},
-    )
+    ctx: dict = {
+        "request": request,
+        "messages": [ai_msg],
+    }
+    if new_title:
+        ctx["new_title"] = new_title
+        ctx["title_element_id"] = f"chat-title-{session_id}"
+    return templates.TemplateResponse("components/chat/messages.html", ctx)
 
 
 # ── セッション削除 ─────────────────────────────────────────────────
@@ -264,11 +323,8 @@ async def delete_session(
             request, date_str, remaining, remaining.messages, db
         )
 
-    new_session = ChatSession(date=date_str, title="新しいチャット")
-    db.add(new_session)
-    await db.commit()
-    await db.refresh(new_session)
-    return await _render_daily_chat_panel(request, date_str, new_session, [], db)
+    # セッションがなくなった場合は空パネルを表示（初回メッセージ時に作成）
+    return await _render_daily_chat_panel(request, date_str, None, [], db)
 
 
 # ── 内部ヘルパー ───────────────────────────────────────────────────
@@ -277,11 +333,25 @@ async def delete_session(
 async def _render_daily_chat_panel(
     request: Request,
     date_str: str,
-    session: ChatSession,
+    session: ChatSession | None,
     messages: list[ChatMessage],
     db: AsyncSession,
 ) -> HTMLResponse:
     """日毎チャットパネル HTML を生成する"""
+    if session is None:
+        return templates.TemplateResponse(
+            "components/chat/daily_panel.html",
+            {
+                "request": request,
+                "date_str": date_str,
+                "session": None,
+                "messages": [],
+                "all_sessions": [],
+                "current_index": 0,
+                "total_sessions": 0,
+            },
+        )
+
     stmt = (
         select(ChatSession)
         .where(ChatSession.date == date_str, ChatSession.article_id.is_(None))
@@ -309,12 +379,13 @@ async def _render_daily_chat_panel(
 
 def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
     """レスポンスからグラウンディング情報を抽出する"""
+    text = response.text or ""
     try:
         meta = response.candidates[0].grounding_metadata
         if not meta or not meta.grounding_chunks:
-            return False, [], response.text
+            return False, [], text
     except (AttributeError, IndexError):
-        return False, [], response.text
+        return False, [], text
 
     sources: list[dict] = []
     for chunk in meta.grounding_chunks:
@@ -323,9 +394,7 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
             sources.append({"title": web.title or "", "uri": web.uri or ""})
 
     if not sources:
-        return False, [], response.text
-
-    text = response.text
+        return False, [], text
     supports = meta.grounding_supports or []
     if supports:
         indexed = []

@@ -37,20 +37,29 @@
           if (needLoad) {
             this.loaded = true;
             var url = '/daily-chat/' + dateStr + '/sessions/latest';
-            // 広い画面用パネル
-            var desktop = document.getElementById('daily-chat-panel');
-            if (desktop) htmx.ajax('GET', url, {target: '#daily-chat-panel', swap: 'innerHTML'});
-            // 狭い画面用パネル
-            var mobile = document.getElementById('daily-chat-panel-mobile');
-            if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
+            // 画面幅に応じて1つのパネルにのみ読み込む（二重リクエスト防止）
+            if (window.innerWidth >= 1024) {
+              var desktop = document.getElementById('daily-chat-panel');
+              if (desktop) htmx.ajax('GET', url, {target: '#daily-chat-panel', swap: 'innerHTML'});
+            } else {
+              var mobile = document.getElementById('daily-chat-panel-mobile');
+              if (mobile) htmx.ajax('GET', url, {target: '#daily-chat-panel-mobile', swap: 'innerHTML'});
+            }
           }
         }
       });
 
-      // dailyChat.open の変更を監視してスクロールロックを同期（Escape等で閉じた場合にも対応）
+      // dailyChat.open の変更を監視してスクロールロック・スティッキーバー位置を同期
       Alpine.effect(() => {
         var store = Alpine.store('dailyChat');
-        if (store) store._updateBodyScroll(store.open);
+        if (store) {
+          store._updateBodyScroll(store.open);
+          // スティッキーバーの right 位置を更新
+          var bar = document.getElementById('section-sticky-bar');
+          if (bar) {
+            bar.style.right = (store.open && window.innerWidth >= 1024) ? '420px' : '0';
+          }
+        }
       });
       // リサイズ時にもスクロールロック状態を再評価
       window.addEventListener('resize', () => {
@@ -257,8 +266,15 @@
     return clone;
   }
 
+  function updateStickyRight() {
+    if (!stickyWrap || !window.Alpine) return;
+    var chatOpen = Alpine.store('dailyChat') && Alpine.store('dailyChat').open;
+    stickyWrap.style.right = (chatOpen && window.innerWidth >= 1024) ? '420px' : '0';
+  }
+
   function updateBar() {
     if (!stickyWrap || !window.Alpine) return;
+    updateStickyRight();
 
     var sections = Array.from(document.querySelectorAll('section[data-section-title]'));
 

@@ -205,19 +205,22 @@ async def send_message(
     db.add(ai_msg)
 
     # 初回メッセージのときセッションタイトルを自動生成
+    new_title = None
     if len(chat_session.messages) == 0:
-        chat_session.title = await _generate_title(message)
+        new_title = await _generate_title(message)
+        chat_session.title = new_title
 
     await db.commit()
 
     # 新しいメッセージのみ HTML で返す（HTMX append）
-    return templates.TemplateResponse(
-        "components/chat/messages.html",
-        {
-            "request": request,
-            "messages": [ai_msg],
-        },
-    )
+    ctx: dict = {
+        "request": request,
+        "messages": [ai_msg],
+    }
+    if new_title:
+        ctx["new_title"] = new_title
+        ctx["title_element_id"] = f"chat-title-{session_id}"
+    return templates.TemplateResponse("components/chat/messages.html", ctx)
 
 
 # ── セッション削除 ──────────────────────────────────────────────────
@@ -327,7 +330,9 @@ async def _get_or_create_article(article_id: str, db: AsyncSession) -> Article |
         "ai",
         "cl",
         "industry",
+        "industry_news",
         "community",
+        "github_trending",
         "python",
     ]
     for date_str in list_available_dates():
@@ -405,12 +410,13 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
         - sources: [{"title": str, "uri": str}, ...]
         - cited_text: インライン引用 [1][2] を埋め込んだテキスト
     """
+    text = response.text or ""
     try:
         meta = response.candidates[0].grounding_metadata
         if not meta or not meta.grounding_chunks:
-            return False, [], response.text
+            return False, [], text
     except (AttributeError, IndexError):
-        return False, [], response.text
+        return False, [], text
 
     # ソース一覧を構築
     sources: list[dict] = []
@@ -420,10 +426,9 @@ def _extract_grounding_info(response) -> tuple[bool, list[dict], str]:
             sources.append({"title": web.title or "", "uri": web.uri or ""})
 
     if not sources:
-        return False, [], response.text
+        return False, [], text
 
     # grounding_supports からインライン引用を挿入
-    text = response.text
     supports = meta.grounding_supports or []
     if supports:
         # end_index 降順でソート（後ろから挿入して位置ズレを防ぐ）
