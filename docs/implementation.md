@@ -24,7 +24,7 @@
 
 ## 1. 概要
 
-毎朝 JST 09:00 に自動実行し、前日に公開された AI 関連の論文・記事・サービス情報を収集・要約して 1 ページで閲覧できる個人向け Web アプリ。
+毎日 JST 正午 (12:00) に自動実行し、前日に公開された AI 関連の論文・記事・サービス情報を収集・要約して 1 ページで閲覧できる個人向け Web アプリ。（実行時刻は arXiv の索引反映待ちのため正午。`SCHEDULE_HOUR` で変更可）
 
 ```
 収集 → 重複除去 → 要約（Gemini Pro） → JSON保存 → DB登録 → ダイジェスト生成 → メール通知
@@ -50,7 +50,7 @@ everyday-survey/
 │   ├── config.py                  # 全設定（Settings クラス、.env 読み込み）
 │   ├── schemas.py                 # Pydantic モデル（ArticleItem, DailyCollection）
 │   ├── jinja.py                   # Jinja2 テンプレートエンジン設定（カスタムフィルタ含む）
-│   ├── scheduler.py               # APScheduler（JST 09:00 自動実行）
+│   ├── scheduler.py               # APScheduler（JST 12:00 自動実行）
 │   │
 │   ├── routers/
 │   │   ├── main_page.py           # GET /
@@ -143,7 +143,7 @@ everyday-survey/
 | DB | SQLite | aiosqlite + SQLAlchemy async |
 | データ保存 | JSON ファイル | `data/YYYY-MM-DD/` |
 | LLM | Google Gemini API | 個別記事要約・チャット: `gemini-2.5-flash`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-2.5-pro`（`GEMINI_SUMMARY_MODEL`）。チャットは `google-genai` SDK で Google Search グラウンディング付き |
-| スケジューラ | APScheduler (AsyncIOScheduler) | `Asia/Tokyo` JST 09:00 実行 |
+| スケジューラ | APScheduler (AsyncIOScheduler) | `Asia/Tokyo` JST 12:00 実行（arXiv 索引反映待ち） |
 | 通知 | SMTP | 収集完了時にメール送信 |
 
 ---
@@ -153,7 +153,7 @@ everyday-survey/
 `app/services/pipeline.py:run_daily_pipeline()` が全工程を統括する。
 
 ```
-JST 09:00 (APScheduler)
+JST 12:00 (APScheduler)
     │
     ▼
 ① 収集

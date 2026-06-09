@@ -17,6 +17,7 @@ from app.jinja import templates
 from app.services import themes as themes_svc
 from app.services.theme_search import (
     collect_theme,
+    load_all_theme_stats,
     load_theme_results,
     save_theme_collection,
 )
@@ -27,6 +28,14 @@ JST = pytz.timezone("Asia/Tokyo")
 router = APIRouter()
 
 _MAX_ONDEMAND_DAYS = 31
+
+
+def _theme_stats(themes: list) -> dict[str, dict]:
+    """各テーマの収集論文数・最終収集日・収集日数を集計する（一覧バッジ用）。
+
+    全日付ディレクトリを1回だけ走査する load_all_theme_stats に委譲する。
+    """
+    return load_all_theme_stats([t.id for t in themes])
 
 
 # ── 表示ページ ────────────────────────────────────────────────
@@ -40,6 +49,7 @@ async def themes_page(request: Request):
         {
             "request": request,
             "themes": themes,
+            "theme_stats": _theme_stats(themes),
             "max_themes": themes_svc.MAX_THEMES,
             "max_keywords": themes_svc.MAX_KEYWORDS,
             "default_to": datetime.now(JST).date().isoformat(),
@@ -53,7 +63,9 @@ async def theme_detail(request: Request, theme_id: str):
     theme = themes_svc.get_theme(theme_id)
     if theme is None:
         raise HTTPException(status_code=404, detail="テーマが見つかりません。")
-    collections = load_theme_results(theme_id)
+    # 0 件の日（検索したが該当なし）は表示から除外。これにより詳細ページの
+    # 「最新日を開く」折りたたみが常に実データのある最新日を指す。
+    collections = [c for c in load_theme_results(theme_id) if c.items]
     total = sum(c.total for c in collections)
     return templates.TemplateResponse(
         "pages/theme_detail.html",
@@ -76,6 +88,7 @@ def _themes_list_fragment(request: Request) -> HTMLResponse:
         {
             "request": request,
             "themes": themes,
+            "theme_stats": _theme_stats(themes),
             "max_keywords": themes_svc.MAX_KEYWORDS,
             "default_to": datetime.now(JST).date().isoformat(),
             "default_from": (datetime.now(JST).date() - timedelta(days=7)).isoformat(),
@@ -181,7 +194,12 @@ async def admin_ondemand_search(request: Request, theme_id: str):
             status_code=400,
         )
 
-    asyncio.create_task(_run_ondemand(theme, date_from, date_to))
+    from app.services.tasks import spawn
+
+    spawn(
+        _run_ondemand(theme, date_from, date_to),
+        name=f"theme-ondemand:{theme.id}:{from_str}_{to_str}",
+    )
 
     msg = (
         f"テーマ「{theme.name}」を {from_str}〜{to_str} で検索開始しました"

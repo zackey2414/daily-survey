@@ -30,7 +30,7 @@ JST = pytz.timezone("Asia/Tokyo")
 
 
 async def run_daily_pipeline(collection_date: date | None = None) -> None:
-    """毎朝 09:00 に実行されるメインパイプライン"""
+    """日次（既定 JST 12:00）に実行されるメインパイプライン"""
     start_time = time.monotonic()
 
     if collection_date is None:
@@ -180,6 +180,52 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
         "コミュニティ": len(community_items),
         "GitHub Trending": len(github_trending_items),
     }
+
+    # 要約失敗件数を集計してレポートに反映（無音の劣化を可視化）
+    _all_batches = [
+        cv_arxiv_papers,
+        openreview_items,
+        lg_papers,
+        ai_papers,
+        cl_papers,
+        industry_items,
+        industry_news_items,
+        community_items,
+        github_trending_items,
+    ]
+    summarize_failures = sum(
+        1 for batch in _all_batches for it in batch if not it.summarized
+    )
+    if summarize_failures:
+        msg = f"要約失敗 {summarize_failures} 件（Gemini エラー等で要約できず）"
+        errors.append(msg)
+        logger.warning(msg)
+
+    # arXiv カテゴリの 0 件を可視化（遡及フォールバック後も 0 なら障害/異常の兆候）
+    empty_arxiv_cats = [
+        name
+        for name, items in [
+            ("cs.CV", cv_arxiv_papers),
+            ("cs.LG", lg_papers),
+            ("cs.AI", ai_papers),
+            ("cs.CL", cl_papers),
+        ]
+        if not items
+    ]
+    if len(empty_arxiv_cats) == 4:
+        msg = (
+            "arXiv 全カテゴリ (cv/lg/ai/cl) が 0 件です。"
+            "API インデックス反映遅延または障害の可能性があります。"
+        )
+        errors.append(msg)
+        logger.error(msg)
+    elif empty_arxiv_cats:
+        msg = (
+            f"arXiv カテゴリ {', '.join(empty_arxiv_cats)} が 0 件でした"
+            "（遡及フォールバック後）。"
+        )
+        errors.append(msg)
+        logger.warning(msg)
 
     # DB に記事を登録（チャット機能のため）
     await _register_articles_to_db(

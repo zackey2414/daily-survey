@@ -1,17 +1,27 @@
 <!--
   テーマ管理カード一覧 (list.html)
-  必要変数: themes (list[Theme]), max_keywords, default_from, default_to
+  必要変数: themes (list[Theme]), theme_stats (dict[id->{total,last_date,days}]),
+            max_keywords, default_from, default_to
   #themes-list-container の innerHTML として swap される
 -->
 {% for theme in themes %}
+{% set stat = (theme_stats.get(theme.id) if theme_stats is defined else None) or {} %}
 <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
   <!-- ヘッダー -->
   <div class="flex items-center justify-between px-5 py-3.5"
        style="background: linear-gradient(135deg, #1e293b 0%, #4338ca 100%);">
-    <div class="flex items-center gap-2.5 min-w-0">
+    <div class="flex items-center gap-2.5 min-w-0 flex-wrap">
       <a href="/themes/{{ theme.id }}"
          class="text-white font-semibold text-sm truncate hover:underline">{{ theme.name }}</a>
       <span class="text-white/50 text-xs shrink-0 whitespace-nowrap">{{ theme.keywords|length }} ワード</span>
+      <a href="/themes/{{ theme.id }}"
+         class="text-xs font-medium shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full
+           {% if stat.get('total') %}bg-white/15 text-white ring-1 ring-white/20 hover:bg-white/25{% else %}bg-white/5 text-white/40{% endif %}">
+        論文 {{ stat.get('total', 0) }} 件
+      </a>
+      {% if stat.get('last_date') %}
+      <span class="text-white/40 text-[11px] shrink-0 whitespace-nowrap">最終 {{ stat.get('last_date') }}</span>
+      {% endif %}
     </div>
     <div class="flex items-center gap-2 shrink-0">
       <button hx-post="/admin/themes/{{ theme.id }}/toggle"

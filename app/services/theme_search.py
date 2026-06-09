@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta, timezone
@@ -130,6 +131,18 @@ async def _fetch_arxiv(params: dict[str, Any]) -> str | None:
                     await asyncio.sleep(wait)
                     continue
                 logger.error(f"テーマ arXiv 検索エラー: {e}")
+                return None
+            except (httpx.TimeoutException, httpx.TransportError) as e:
+                # ネットワーク/タイムアウト系も一時障害としてリトライ
+                if attempt < _MAX_RETRIES - 1:
+                    wait = 10 * (2**attempt)
+                    logger.warning(
+                        f"テーマ arXiv 検索 通信エラー: {e} {wait}秒後にリトライ "
+                        f"({attempt + 1}/{_MAX_RETRIES})"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                logger.error(f"テーマ arXiv 検索 通信エラー: {e}")
                 return None
             except httpx.HTTPError as e:
                 logger.error(f"テーマ arXiv 検索エラー: {e}")
@@ -313,9 +326,10 @@ def save_theme_collection(
     themes_dir = settings.data_dir / collection_date_str / "themes"
     themes_dir.mkdir(parents=True, exist_ok=True)
     file_path = themes_dir / f"{theme_id}.json"
-    file_path.write_text(
-        tc.model_dump_json(indent=2, exclude_none=False), encoding="utf-8"
-    )
+    # 一時ファイルに書いてから os.replace でアトミックに置換（書き込み途中の破損防止）
+    tmp = themes_dir / f"{theme_id}.json.tmp"
+    tmp.write_text(tc.model_dump_json(indent=2, exclude_none=False), encoding="utf-8")
+    os.replace(tmp, file_path)
     logger.info(f"テーマ保存: {file_path} ({tc.total} 件)")
     return file_path
 
@@ -339,3 +353,44 @@ def load_theme_results(theme_id: str) -> list[ThemeCollection]:
             logger.warning(f"テーマ結果読み込み失敗 ({file_path}): {e}")
     results.sort(key=lambda c: c.date, reverse=True)
     return results
+
+
+def load_all_theme_stats(theme_ids: list[str]) -> dict[str, dict]:
+    """全日付ディレクトリを1回だけ走査し、各テーマの集計（一覧バッジ用）を返す。
+
+    テーマごとに全日付を走査する load_theme_results を N 回呼ぶより効率的。
+    各 themes/ ディレクトリのファイルを1回ずつ読む（空日 total=0 は集計から除く）。
+    Returns: {theme_id: {total, last_date, days}}
+    """
+    stats: dict[str, dict] = {
+        tid: {"total": 0, "last_date": "", "days": 0} for tid in theme_ids
+    }
+    data_dir = settings.data_dir
+    if not data_dir.exists():
+        return stats
+    wanted = set(theme_ids)
+    # 日付降順で走査 → 最初に見つかった非空日が last_date
+    day_dirs = sorted(
+        (d for d in data_dir.iterdir() if d.is_dir() and d.name.count("-") == 2),
+        key=lambda d: d.name,
+        reverse=True,
+    )
+    for day_dir in day_dirs:
+        themes_dir = day_dir / "themes"
+        if not themes_dir.is_dir():
+            continue
+        for fp in themes_dir.glob("*.json"):
+            tid = fp.stem
+            if tid not in wanted:
+                continue
+            try:
+                tc = ThemeCollection.model_validate_json(fp.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if tc.total > 0:
+                s = stats[tid]
+                s["total"] += tc.total
+                s["days"] += 1
+                if not s["last_date"]:
+                    s["last_date"] = tc.date
+    return stats

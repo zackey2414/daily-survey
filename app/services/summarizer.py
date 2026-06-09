@@ -7,6 +7,7 @@ Gemini API を使った要約処理モジュール
 import asyncio
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -54,11 +55,12 @@ async def summarize_item(
     async with _SEMAPHORE:
         try:
             result = await asyncio.get_event_loop().run_in_executor(
-                None, _call_gemini, prompt
+                None, _call_gemini_with_retry, prompt
             )
             _parse_result(item, result, category)
             item.summarized = True
         except Exception as e:
+            # 失敗時は summarized=False のまま残す（呼び出し側で失敗件数を集計可能）
             logger.error(f"要約失敗 ({item.id}): {e}")
         await asyncio.sleep(_REQUEST_DELAY)
 
@@ -68,7 +70,27 @@ async def summarize_item(
 def _call_gemini(prompt: str) -> str:
     model = _get_summary_model()
     response = model.generate_content(prompt)
-    return response.text
+    # safety ブロック等で candidate が無いと response.text は None を返しうる
+    return getattr(response, "text", None) or ""
+
+
+def _call_gemini_with_retry(prompt: str, max_retries: int = 3) -> str:
+    """一時的な Gemini エラー（quota/429/5xx/ネットワーク）や空応答をリトライする。
+
+    すべてのリトライで失敗・空応答なら例外を送出し、呼び出し側で要約失敗として扱う。
+    """
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            text = _call_gemini(prompt)
+            if text.strip():
+                return text
+            last_exc = ValueError("Gemini が空レスポンスを返しました")
+        except Exception as e:  # noqa: BLE001 — 種別を問わず一時障害として扱う
+            last_exc = e
+        if attempt < max_retries - 1:
+            time.sleep(2 * (attempt + 1))  # 2s, 4s
+    raise last_exc if last_exc is not None else RuntimeError("要約失敗")
 
 
 def _build_prompt(

@@ -10,7 +10,7 @@ app/
 ├── config.py            # 全設定 (環境変数 → Settings クラス)
 ├── schemas.py           # Pydantic モデル (ArticleItem, DailyCollection)
 ├── jinja.py             # Jinja2Templates シングルトン + カスタムフィルター
-├── scheduler.py         # APScheduler (毎日 JST 09:00 にパイプライン実行)
+├── scheduler.py         # APScheduler (毎日 JST 12:00 にパイプライン実行)
 ├── db/
 │   ├── database.py      # SQLAlchemy async エンジン, init_db(), migrate_db()
 │   └── models.py        # ORM モデル (Article, ChatSession, ChatMessage, UserTag)
@@ -73,7 +73,7 @@ app/
 | `GEMINI_CHAT_MODEL` | `gemini-2.5-flash` | チャット・個別要約用モデル |
 | `GEMINI_SEARCH_THRESHOLD` | `0.3` | チャット時の Google Search グラウンディング閾値 (0.0=常に検索, 1.0=検索しない) |
 | `GITHUB_TOKEN` | (空) | GitHub API トークン（任意）。設定するとレートリミット 60→5000 req/h に緩和 |
-| `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `9` / `0` | 日次パイプライン実行時刻 (JST) |
+| `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` | `12` / `0` | 日次パイプライン実行時刻 (JST)。arXiv 索引反映待ちのため正午 |
 
 ### `db/models.py`
 
