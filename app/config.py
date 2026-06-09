@@ -90,11 +90,16 @@ class Settings:
     ]
 
     # 企業ブログ RSS
+    # 注: Anthropic は公式 RSS を廃止（anthropic.com/rss.xml 等が 404）したため、
+    #     anthropic.com を対象にした Google News RSS で自社発表を拾う。
+    #     Meta も AI ブログ (ai.meta.com/blog/rss) が 404 化したため、公式の
+    #     Meta Engineering ブログ RSS に差し替え（AI/システム系を扱い、企業ニュースの
+    #     ノイズが少ない）。
     industry_rss_feeds: dict[str, str] = {
         "OpenAI": "https://openai.com/blog/rss.xml",
         "Google": "https://blog.google/technology/ai/rss/",
-        "Anthropic": "https://www.anthropic.com/rss.xml",
-        "Meta": "https://ai.meta.com/blog/rss/",
+        "Anthropic": "https://news.google.com/rss/search?q=site:anthropic.com&hl=en-US&gl=US&ceid=US:en",
+        "Meta": "https://engineering.fb.com/feed/",
         "Amazon": "https://aws.amazon.com/blogs/machine-learning/feed/",
         "Alibaba": "https://www.alibabacloud.com/blog/feed/tag/ai",
     }
