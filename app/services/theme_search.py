@@ -355,6 +355,40 @@ def load_theme_results(theme_id: str) -> list[ThemeCollection]:
     return results
 
 
+def load_theme_collections_for_date(date_str: str) -> list[ThemeCollection]:
+    """指定収集日(date_str)の、有効テーマごとの ThemeCollection を返す。
+
+    テーマ順は themes.json の並び（enabled のみ）。その日の結果ファイルが無い、
+    または 0 件のテーマは除外する。トップ/アーカイブの「テーマ別論文」表示用。
+    結果は data/{collection_date}/themes/{theme_id}.json に保存されており、
+    archive の date_str はその collection_date と一致する。
+    """
+    from app.services.themes import load_themes
+
+    themes = [t for t in load_themes() if t.enabled]
+    if not themes:
+        return []
+    themes_dir = settings.data_dir / date_str / "themes"
+    if not themes_dir.is_dir():
+        return []
+
+    collections: list[ThemeCollection] = []
+    for theme in themes:
+        file_path = themes_dir / f"{theme.id}.json"
+        if not file_path.exists():
+            continue
+        try:
+            tc = ThemeCollection.model_validate_json(
+                file_path.read_text(encoding="utf-8")
+            )
+        except Exception as e:
+            logger.warning(f"テーマ結果読み込み失敗 ({file_path}): {e}")
+            continue
+        if tc.total > 0:
+            collections.append(tc)
+    return collections
+
+
 def load_all_theme_stats(theme_ids: list[str]) -> dict[str, dict]:
     """全日付ディレクトリを1回だけ走査し、各テーマの集計（一覧バッジ用）を返す。
 

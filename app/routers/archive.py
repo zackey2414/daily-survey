@@ -16,6 +16,7 @@ from app.db.models import UserTag
 from app.jinja import templates
 from app.schemas import ArticleItem
 from app.services.pipeline import load_daily_data, list_available_dates
+from app.services.theme_search import load_theme_collections_for_date
 from app.services.digest import load_digest, inject_citations
 
 router = APIRouter(prefix="/archive")
@@ -40,6 +41,9 @@ async def archive_day(
     target_date_str = (collection_date - timedelta(days=1)).isoformat()
     data = load_daily_data(date_str)
 
+    # テーマ別論文（その日の有効テーマごとの収集結果）
+    theme_collections = load_theme_collections_for_date(date_str)
+
     # 全記事 ID を収集してユーザータグを一括取得
     all_items = []
     for key in [
@@ -55,6 +59,9 @@ async def archive_day(
         "ai_dev",
     ]:
         all_items.extend(data.get(key, []))
+    # テーマ由来の記事（arXiv 専用検索の新規論文を含む）もタグ取得対象に含める
+    for tc in theme_collections:
+        all_items.extend(tc.items)
 
     article_ids = [item.id for item in all_items]
     user_tags_by_id: dict[str, list[str]] = {aid: [] for aid in article_ids}
@@ -105,6 +112,7 @@ async def archive_day(
             "is_today": is_today,
             "has_data": has_data,
             "digest_html": digest_html,
+            "theme_collections": theme_collections,
             "cv_papers": data.get("cv", []),
             "openreview_papers": data.get("openreview", []),
             "lg_papers": data.get("lg", []),
