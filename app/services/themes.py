@@ -4,7 +4,7 @@
 - Gemini でテーマ名から関連キーワードを自動生成する
 
 永続化パターンは github_trending.py のキーワード管理に倣う。
-Gemini クライアントの設定は summarizer.py と同じ（genai はモジュール import 時に configure 済み）。
+Gemini クライアントは app/gemini.py の遅延生成ヘルパー get_client() を共有利用する。
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-import google.generativeai as genai
 import pytz
 
 from app.config import settings
+from app.gemini import get_client
 from app.schemas import Theme
 
 logger = logging.getLogger(__name__)
@@ -33,11 +33,6 @@ MAX_KEYWORDS = 20  # 1テーマあたりのキーワード上限
 MAX_THEMES = 20  # enabled テーマの上限
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
-
-# Gemini API の設定（summarizer.py でも設定されるが、import 順に依存しないよう冪等に再設定）
-if settings.gemini_api_key:
-    genai.configure(api_key=settings.gemini_api_key)
-
 
 # ── レジストリ管理 ────────────────────────────────────────────
 
@@ -221,8 +216,9 @@ def _load_template(name: str) -> str:
 
 
 def _call_gemini(prompt: str) -> str:
-    model = genai.GenerativeModel(settings.gemini_chat_model)
-    response = model.generate_content(prompt)
+    response = get_client().models.generate_content(
+        model=settings.gemini_chat_model, contents=prompt
+    )
     # safety ブロック等で candidate が無いと response.text は None を返しうる
     return (getattr(response, "text", None) or "").strip()
 

@@ -9,22 +9,15 @@ import logging
 import re
 from pathlib import Path
 
-import google.generativeai as genai
-
 from app.config import settings
+from app.gemini import get_client
 from app.schemas import ArticleItem
 
 logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 
-genai.configure(api_key=settings.gemini_api_key)
-
 CITATION_RE = re.compile(r"\[ref:([a-z0-9_\-]+(?:,\s*ref:[a-z0-9_\-]+)*)\]")
-
-
-def _get_model() -> genai.GenerativeModel:
-    return genai.GenerativeModel(settings.gemini_summary_model)
 
 
 def inject_citations(text: str, date_str: str, is_archive: bool) -> str:
@@ -92,7 +85,15 @@ async def generate_digest(
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: _get_model().generate_content(prompt).text
+            None,
+            lambda: (
+                get_client()
+                .models.generate_content(
+                    model=settings.gemini_summary_model, contents=prompt
+                )
+                .text
+                or ""
+            ),
         )
     except Exception as e:
         logger.error(f"ダイジェスト生成失敗: {e}")

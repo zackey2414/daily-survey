@@ -107,7 +107,8 @@
 | チャット応答 | `gemini-3.1-flash-lite` | `GEMINI_CHAT_MODEL` | 対話的応答はコスト・速度を優先。Google Search グラウンディング付き |
 
 - モデル名は設定ファイル（`.env`）で個別に切り替え可能
-- チャット応答は `google-genai` SDK を使用し、RAG コンテキストで不足する場合に Gemini が自動で Google 検索を実行する
+- 全ての Gemini 呼び出し（要約・ダイジェスト・テーマキーワード生成・チャット）は `google-genai` SDK（`from google import genai` / `genai.Client`）を使用する
+- チャット応答では、RAG コンテキストで不足する場合に Gemini が自動で Google 検索を実行する
 
 ---
 
