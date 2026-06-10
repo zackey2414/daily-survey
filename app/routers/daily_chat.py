@@ -12,7 +12,6 @@ import asyncio
 import json
 import logging
 
-from google import genai as genai_new
 from google.genai.types import (
     Content,
     GenerateContentConfig,
@@ -20,7 +19,6 @@ from google.genai.types import (
     Part,
     Tool,
 )
-import google.generativeai as genai
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
@@ -28,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.gemini import get_client
 from app.db.database import get_db
 from app.db.models import ChatMessage, ChatSession
 from app.services.pipeline import load_daily_data
@@ -36,13 +35,6 @@ from app.jinja import templates
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/daily-chat")
-
-_genai_client = genai_new.Client(api_key=settings.gemini_api_key)
-genai.configure(api_key=settings.gemini_api_key)
-
-
-def _get_chat_model() -> genai.GenerativeModel:
-    return genai.GenerativeModel(settings.gemini_chat_model)
 
 
 def _build_daily_rag_context(date_str: str) -> str:
@@ -454,7 +446,7 @@ async def _generate_daily_response(
     try:
         response = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: _genai_client.models.generate_content(
+            lambda: get_client().models.generate_content(
                 model=settings.gemini_chat_model,
                 contents=contents,
                 config=GenerateContentConfig(
@@ -482,10 +474,12 @@ async def _generate_title(first_message: str) -> str:
     """初回メッセージからセッションタイトルを自動生成する"""
     prompt = f"以下の質問を30文字以内の日本語タイトルにしてください。タイトルのみ出力してください。\n\n{first_message}"
     try:
-        model = _get_chat_model()
         response = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: model.generate_content(prompt)
+            None,
+            lambda: get_client().models.generate_content(
+                model=settings.gemini_chat_model, contents=prompt
+            ),
         )
-        return response.text.strip()[:100]
+        return (response.text or "").strip()[:100] or first_message[:30]
     except Exception:
         return first_message[:30]

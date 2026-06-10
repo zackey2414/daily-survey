@@ -164,7 +164,7 @@ everyday-survey/
 | CSS | Tailwind CSS | CDN 経由（Play CDN） |
 | DB | SQLite | aiosqlite + SQLAlchemy async |
 | データ保存 | JSON ファイル | `data/YYYY-MM-DD/` |
-| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-3.1-flash-lite`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-3-flash-preview`（`GEMINI_SUMMARY_MODEL`）。チャットは `google-genai` SDK で Google Search グラウンディング付き |
+| LLM | Google Gemini API | 個別記事要約・チャット: `gemini-3.1-flash-lite`（`GEMINI_CHAT_MODEL`）、一面まとめ: `gemini-3-flash-preview`（`GEMINI_SUMMARY_MODEL`）。全ての Gemini 呼び出しは `google-genai` SDK（`from google import genai` / `genai.Client`）を使用し、チャットは Google Search グラウンディング付き |
 | スケジューラ | APScheduler (AsyncIOScheduler) | `Asia/Tokyo` JST 12:00 実行（arXiv 索引反映待ち） |
 | 通知 | SMTP | 収集完了時にメール送信 |
 

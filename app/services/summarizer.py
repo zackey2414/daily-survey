@@ -11,9 +11,8 @@ import time
 from pathlib import Path
 from typing import Literal
 
-import google.generativeai as genai
-
 from app.config import settings
+from app.gemini import get_client
 from app.schemas import ArticleItem
 
 logger = logging.getLogger(__name__)
@@ -30,16 +29,9 @@ def _load_template(name: str) -> str:
     return ""
 
 
-# Gemini API の設定
-genai.configure(api_key=settings.gemini_api_key)
-
 # 1 分あたりの並列リクエスト上限（レート制限対策）
 _SEMAPHORE = asyncio.Semaphore(5)
 _REQUEST_DELAY = 1.0  # 秒
-
-
-def _get_summary_model() -> genai.GenerativeModel:
-    return genai.GenerativeModel(settings.gemini_chat_model)
 
 
 async def summarize_item(
@@ -68,8 +60,9 @@ async def summarize_item(
 
 
 def _call_gemini(prompt: str) -> str:
-    model = _get_summary_model()
-    response = model.generate_content(prompt)
+    response = get_client().models.generate_content(
+        model=settings.gemini_chat_model, contents=prompt
+    )
     # safety ブロック等で candidate が無いと response.text は None を返しうる
     return getattr(response, "text", None) or ""
 
