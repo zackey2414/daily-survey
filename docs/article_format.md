@@ -140,7 +140,7 @@ pipeline.py では `summarize_items(industry_items, "industry")` として呼び
 ## 4. GitHub Trending
 
 `source_type: "github_trending"` のアイテムに適用（GitHub Trending）。
-全言語の AI/LLM 関連リポジトリを対象。記事フォーマットと同じプロンプトを使用するが、ポイントは2箇条を目安とする。
+全言語の AI/LLM 関連リポジトリを対象。記事フォーマット（`category="article"`）と同じ `summary_article.md` プロンプトを使用する（ポイントは3箇条）。GitHub Trending 専用のプロンプト分岐や箇条数の調整は存在しない。
 ランキング情報（日次/週次/月次スター増加数、累計スター数）は `tags` フィールドに `stars_daily:N` 形式で格納される。
 
 ```
@@ -153,6 +153,7 @@ pipeline.py では `summarize_items(industry_items, "industry")` として呼び
 【ポイント】
 - （特徴・用途ポイント1）
 - （特徴・用途ポイント2）
+- （特徴・用途ポイント3）
 
 【タグ】
 （スペース区切り、5個程度）
@@ -180,5 +181,8 @@ pipeline.py では `summarize_items(industry_items, "industry")` として呼び
 | `papers_lg/ai/cl.json` | `summarize_items(items, "paper")` | 論文 |
 | `papers_industry.json` | `summarize_items(items, "industry")` | 企業動向（定量指標あり） |
 | `papers_industry_news.json` | `summarize_items(items, "industry")` | 企業動向（定量指標あり） |
+| `papers_ai_dev.json` | `summarize_items(items, "industry")` | 企業動向（定量指標あり） |
 | `papers_community.json` | `summarize_items(items, "article")` | 記事 |
-| `papers_python.json` | `summarize_items(items, "article")` | 記事 |
+| `papers_github_trending.json` | `summarize_items(items, "article")` | 記事 |
+
+※ `papers_python.json` は現行パイプラインでは生成されない。GitHub Trending は `papers_github_trending.json` として保存され（`github_trending → python` の旧データ読み込み互換フォールバックのみ存在）、`ai_dev`（LLM・AIエージェント動向）は `industry` プロンプト（定量指標あり）で要約される。

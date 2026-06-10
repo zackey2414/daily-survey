@@ -15,24 +15,26 @@ app/
 │   ├── database.py      # SQLAlchemy async エンジン, init_db(), migrate_db()
 │   └── models.py        # ORM モデル (Article, ChatSession, ChatMessage, UserTag)
 ├── routers/
-│   ├── main_page.py     # GET / — トップページ (当日の記事一覧 + ダイジェスト)
+│   ├── main_page.py     # GET / , /today — 当日アーカイブ (/archive/{today}) へリダイレクト + /health
 │   ├── archive.py       # GET /archive/{date} — 過去日付の記事一覧
 │   ├── summaries.py     # GET /summaries, /summaries/{date} — サマリー閲覧
 │   ├── tags.py          # GET /tags/, /tags/{name} — タグ一覧・タグ別記事
 │   ├── user_tags.py     # POST/DELETE /user-tags/ — ユーザータグ CRUD (HTMX)
 │   ├── themes.py        # GET /themes, /themes/{id} + /admin/themes/* — 検索テーマ管理・オンデマンド検索 (HTMX)
-│   └── chat.py          # チャット機能 (セッション管理, メッセージ送受信, RAG + Google Search)
+│   ├── chat.py          # 記事チャット機能 (セッション管理, メッセージ送受信, RAG + Google Search)
+│   └── daily_chat.py    # 一面まとめ（日次）チャット機能 (/daily-chat/* — その日の全記事を対象に RAG)
 ├── services/
 │   ├── pipeline.py      # 日次パイプライン統括 (収集 → 要約 → テーマ検索 → ダイジェスト → 通知)
 │   ├── summarizer.py    # Gemini による個別記事要約 (paper / industry / article)
 │   ├── themes.py        # 検索テーマのレジストリ (data/themes.json) + Gemini キーワード生成
 │   ├── theme_search.py  # テーマのハイブリッド収集 (arXiv 専用検索 + 収集済みアイテムのフィルタ)
 │   ├── digest.py        # 一面まとめ (ダイジェスト) 生成・Markdown 保存
-│   ├── rag.py           # RAG コンテキスト構築 (URL フェッチ, チャンク分割, Jaccard スコアリング)
+│   ├── rag.py           # RAG コンテキスト構築 (URL フェッチ, チャンク分割, トークン重なりスコアリング)
+│   ├── tasks.py         # fire-and-forget バックグラウンドタスク投入ヘルパー (spawn)
 │   ├── notifier.py      # SMTP メール通知
 │   └── collector/       # データ収集モジュール群
 │       ├── arxiv.py         # arXiv API (cs.CV / cs.LG / cs.AI / cs.CL)
-│       ├── openreview.py    # OpenReview API (主要10学会)
+│       ├── openreview.py    # OpenReview API (主要6学会: NeurIPS/ICLR/ICML/CVPR/ICCV/ECCV)
 │       ├── industry.py      # AI 企業公式ブログ RSS
 │       ├── industry_news.py # 海外ニュースメディア RSS + キーワードフィルタ
 │       ├── community.py     # Qiita API / Zenn RSS / Reddit JSON API
@@ -55,6 +57,7 @@ app/
         ├── article/     # 記事カード・要約表示
         ├── chat/        # チャットパネル・メッセージ
         │   ├── panel.html
+        │   ├── daily_panel.html   # 一面まとめ（日次）チャットパネル
         │   ├── messages.html
         │   └── message_item.html
         ├── theme/       # テーマ管理カード・キーワードチップ (HTMX フラグメント)
@@ -102,7 +105,7 @@ app/
 2. **RAG コンテキスト構築**: 初回メッセージ時に記事本文を取得しセッションにキャッシュ
 3. **応答生成** (`_generate_response`):
    - Gemini にシステム指示 + RAG コンテキスト + 会話履歴を渡す
-   - `google_search_retrieval` ツールを付与し、Gemini が必要と判断した場合に Google 検索を実行
+   - `google_search` グラウンディングツール (`Tool(google_search=GoogleSearch())`) を付与し、Gemini が必要と判断した場合に Google 検索を実行
    - レスポンスの `grounding_metadata` から検索ソースを抽出
 4. **DB 保存**: メッセージ本文に加え `used_search` / `search_sources` を永続化
 
@@ -112,14 +115,14 @@ RAG コンテキスト構築の流れ:
 
 1. JSON に保存済みの記事メタ情報 (abstract, summary, novelty, key_points) を収集
 2. 記事 URL から httpx + BeautifulSoup で本文テキストをフェッチ (キャッシュ付き)
-3. テキストをチャンク分割し、ユーザー質問との Jaccard 類似度でスコアリング
+3. テキストをチャンク分割し、ユーザー質問とのトークン重なり（クエリ語の被覆率 = |共通トークン| / |クエリトークン|）でスコアリング
 4. 上位チャンクを選択してコンテキスト文字列を構築
 
 ### `services/pipeline.py`
 
 日次パイプラインの実行順序:
 
-1. 全カテゴリの記事を並列収集 (`collector/*`)
+1. 全カテゴリの記事をソース間 3 秒待機で直列収集 (`collector/*`、レートリミット・リソース競合の回避のため)
 2. 収集結果を JSON 保存 + 重複除去
 3. 未要約アイテムを Gemini で要約 (`summarizer.py`)
 4. 有効な検索テーマごとに該当論文・記事を収集・保存 (`theme_search.py`)

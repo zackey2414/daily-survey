@@ -8,7 +8,7 @@
 |--------|-----|------|
 | **トップページ** | `/` | 当日の一面まとめ + 全カテゴリの記事一覧。記事ごとに要約・チャット・タグ管理が可能 |
 | **アーカイブ** | `/archive/YYYY-MM-DD` | 過去日付の記事一覧。トップページと同じレイアウト |
-| **サマリー履歴** | `/summaries` | 過去の一面まとめを一覧表示。最新3日分ビューと全件ビューを切り替え可能 |
+| **サマリー履歴** | `/summaries` | 過去の一面まとめを一覧表示（10件/ページのページネーション、最新から降順） |
 | **サマリー詳細** | `/summaries/YYYY-MM-DD` | 特定日の一面まとめを Markdown でレンダリング表示 |
 | **タグ一覧** | `/tags/` | AI 生成タグとユーザー追加タグを別セクションで一覧表示。出現回数でサイズが変わるタグクラウド形式 |
 | **タグ別記事** | `/tags/{tag_name}` | 指定タグを持つ記事を全期間・全カテゴリから横断検索して表示 |
@@ -20,7 +20,7 @@
 
 | カテゴリ | 内容 | 収集方法 |
 |----------|------|----------|
-| CV 論文 | arXiv `cs.CV` + OpenReview（CVPR / NeurIPS / ICLR 等10学会） | arXiv API + OpenReview API |
+| CV 論文 | arXiv `cs.CV` + OpenReview（NeurIPS / ICLR / ICML / CVPR / ICCV / ECCV の6学会） | arXiv API + OpenReview API |
 | AI 全般論文 | arXiv `cs.LG` / `cs.AI` / `cs.CL` | arXiv API |
 | AI 企業動向（自社発表） | OpenAI / Google / Anthropic / Meta / Amazon / Alibaba 公式ブログ | RSS フィード |
 | AI 企業動向（その他報道） | BBC / TechCrunch / The Verge / Wired | RSS フィード + キーワードフィルタ |
@@ -55,7 +55,7 @@
 | レイヤー | 技術 |
 |----------|------|
 | Backend | Python 3.12 + FastAPI |
-| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS + marked.js (すべて CDN) |
+| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS (すべて CDN) |
 | DB | SQLite (aiosqlite + SQLAlchemy async) |
 | LLM | Google Gemini API |
 | スケジューラ | APScheduler (AsyncIOScheduler, Asia/Tokyo) |
@@ -134,6 +134,7 @@ docker compose down
 | `./db:/app/db` | SQLite DB (チャット履歴・ユーザータグ) |
 | `./logs:/app/logs` | アプリログ |
 | `./app:/app/app` | 開発時ホットリロード用 |
+| `./prompts:/app/prompts` | プロンプトテンプレート（要約・ダイジェスト） |
 
 ### ローカルで直接起動
 

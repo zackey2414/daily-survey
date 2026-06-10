@@ -1,7 +1,7 @@
 # 実装詳細ドキュメント: AI Daily Survey
 
 **バージョン**: 現行実装
-**最終更新**: 2026-03-22
+**最終更新**: 2026-06-09
 
 ---
 
@@ -27,7 +27,7 @@
 毎日 JST 正午 (12:00) に自動実行し、前日に公開された AI 関連の論文・記事・サービス情報を収集・要約して 1 ページで閲覧できる個人向け Web アプリ。（実行時刻は arXiv の索引反映待ちのため正午。`SCHEDULE_HOUR` で変更可）
 
 ```
-収集 → 重複除去 → 要約（Gemini） → JSON保存 → DB登録 → ダイジェスト生成 → メール通知
+収集 → 重複除去 → 要約（Gemini） → JSON保存 → DB登録 → テーマ検索 → ダイジェスト生成 → メール通知
 ```
 
 リモートサーバ上の Docker コンテナで動作。SSH トンネル経由で `http://localhost:8000` にアクセス。
@@ -52,11 +52,16 @@ everyday-survey/
 │   ├── jinja.py                   # Jinja2 テンプレートエンジン設定（カスタムフィルタ含む）
 │   ├── scheduler.py               # APScheduler（JST 12:00 自動実行）
 │   │
+│   ├── static/                    # 静的ファイル（main.py で /static にマウント）
+│   │   └── js/chat.js             # チャット用 JavaScript
+│   │
 │   ├── routers/
-│   │   ├── main_page.py           # GET /
-│   │   ├── archive.py             # GET /archive/{date_str}
+│   │   ├── main_page.py           # GET / , /today（当日アーカイブへリダイレクト）
+│   │   ├── archive.py             # GET /archive/{date_str}（トップページ本体を描画）
 │   │   ├── summaries.py           # GET /summaries, /summaries/{date_str}
-│   │   ├── chat.py                # チャット API（HTMX 対応）
+│   │   ├── chat.py                # 記事チャット API（HTMX 対応）
+│   │   ├── daily_chat.py          # 一面まとめチャット API（/daily-chat/{date_str}/...）
+│   │   ├── themes.py              # 検索テーマ管理（GET /themes, /admin/themes/...）
 │   │   ├── tags.py                # GET /tags/, /tags/{tag_name}
 │   │   └── user_tags.py           # POST/DELETE /user-tags/{article_id}
 │   │
@@ -66,14 +71,18 @@ everyday-survey/
 │   │   ├── digest.py              # 一面まとめ生成・保存 + inject_citations
 │   │   ├── notifier.py            # SMTP メール通知
 │   │   ├── rag.py                 # チャット用 URL フェッチ・RAG コンテキスト構築
+│   │   ├── themes.py              # 検索テーマ管理（data/themes.json 永続化・Gemini キーワード自動生成）
+│   │   ├── theme_search.py        # テーマのハイブリッド収集（arXiv 全文検索＋当日収集済みアイテムのフィルタ）
+│   │   ├── tasks.py               # fire-and-forget バックグラウンドタスク spawn ヘルパー
 │   │   └── collector/
 │   │       ├── arxiv.py           # arXiv API（cs.CV / cs.LG / cs.AI / cs.CL）
-│   │       ├── openreview.py      # OpenReview API v2（CVPR/NeurIPS/ICLR 等10学会）
+│   │       ├── openreview.py      # OpenReview API v2（NeurIPS/ICLR/ICML/CVPR/ICCV/ECCV の6学会）
 │   │       ├── industry.py        # 企業公式ブログ RSS（自社発表）
 │   │       ├── industry_news.py   # 海外大手ニュースサイト RSS（その他報道）
 │   │       ├── community.py       # Qiita API / Zenn RSS / Reddit JSON API
 │   │       ├── python_news.py     # (旧) Python 限定 GitHub Trending（後方互換用）
-│   │       └── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付きスクレイパー
+│   │       ├── github_trending.py # GitHub Trending 全言語 AI/LLM フィルタ付きスクレイパー
+│   │       └── ai_dev.py          # LLM・AIエージェント動向（公式アップデート RSS + 性能ニュース）
 │   │
 │   ├── db/
 │   │   ├── database.py            # SQLAlchemy async セッション・init_db・migrate_db
@@ -87,20 +96,30 @@ everyday-survey/
 │       │   ├── summary_detail.html # 個別サマリー詳細
 │       │   ├── tags_list.html     # タグ一覧
 │       │   ├── tags.html          # タグ別記事一覧
+│       │   ├── themes_list.html   # 検索テーマ一覧 + 管理 UI（GET /themes）
+│       │   ├── theme_detail.html  # テーマ別の収集結果（日付横断、GET /themes/{theme_id}）
 │       │   ├── chat_search.html   # チャット検索
 │       │   └── error.html         # 404 / 500 エラーページ
 │       └── components/
 │           ├── article/
 │           │   ├── section.html   # セクション（折りたたみトグル）
-│           │   └── card.html      # 記事カード（要約・チャット・タグ UI）
+│           │   ├── card.html      # 記事カード（要約・チャット・タグ UI）
+│           │   └── github_trending_section.html # GitHub Trending セクション（ソートUI付き）
 │           ├── chat/
-│           │   ├── panel.html     # チャットパネル（インライン展開）
+│           │   ├── panel.html     # 記事チャットパネル（インライン展開）
+│           │   ├── daily_panel.html # 一面まとめチャットパネル（daily_chat.py が描画）
 │           │   ├── messages.html  # メッセージ一覧
 │           │   └── message_item.html
-│           └── tags/
-│               └── user_tags.html # ユーザータグ一覧 HTML（HTMX スワップ対象）
+│           ├── tags/
+│           │   └── user_tags.html # ユーザータグ一覧 HTML（HTMX スワップ対象）
+│           └── theme/
+│               ├── list.html      # 検索テーマ一覧（HTMX スワップ対象）
+│               └── keywords.html  # テーマ別キーワード編集 HTML
 │
 ├── data/                          # 日次収集 JSON データ（永続化）
+│   ├── themes.json                # 登録テーマ（Theme）の永続化
+│   ├── github_trending_index.json     # GitHub Trending 調査済みリポジトリのインデックス
+│   ├── github_trending_keywords.json  # GitHub Trending カスタムキーワード（設定時のみ）
 │   └── YYYY-MM-DD/
 │       ├── papers_cv.json
 │       ├── papers_openreview.json
@@ -110,7 +129,10 @@ everyday-survey/
 │       ├── papers_industry.json
 │       ├── papers_industry_news.json
 │       ├── papers_community.json
-│       └── papers_python.json
+│       ├── papers_github_trending.json
+│       ├── papers_ai_dev.json
+│       └── themes/
+│           └── {theme_id}.json    # テーマ検索結果（ThemeCollection）
 │
 ├── summaries/                     # 日次一面まとめ（Markdown）
 │   └── YYYY-MM-DD.md
@@ -160,7 +182,7 @@ JST 12:00 (APScheduler)
     [直列] collect_all_arxiv_serial(target_date)
     │   └── 1クライアントで cs.CV → cs.LG → cs.AI → cs.CL を直列取得（カテゴリ間5秒待機）
     [直列] 各ソースを順次収集（ソース間3秒待機）
-    ├── collect_openreview(target_date)      → OpenReview（10学会）
+    ├── collect_openreview(target_date)      → OpenReview（6学会）
     ├── collect_industry(target_date)        → 企業公式 RSS（自社発表）
     ├── collect_industry_news(target_date)   → 海外ニュース RSS（その他報道）
     ├── collect_community(target_date)       → Qiita / Zenn / Reddit
@@ -173,8 +195,9 @@ JST 12:00 (APScheduler)
     │
     ▼
 ③ 並列要約 (asyncio.gather, Gemini)
-    ├── 論文カテゴリ: summarize_items(items, "paper")
-    └── 記事カテゴリ: summarize_items(items, "article")
+    ├── 論文系 (cv / openreview / lg / ai / cl): summarize_items(items, "paper")
+    ├── 企業動向系 (industry / industry_news / ai_dev): summarize_items(items, "industry")
+    └── 記事系 (community / github_trending): summarize_items(items, "article")
     │
     ▼
 ④ JSON 保存
@@ -182,6 +205,10 @@ JST 12:00 (APScheduler)
     │
     ▼
 ⑤ DB 登録（チャット機能のために Article レコードを upsert）
+    │
+    ▼
+⑤.5 テーマ検索（有効テーマごとに該当論文・記事を収集して保存）
+    └── data/YYYY-MM-DD/themes/{theme_id}.json に保存
     │
     ▼
 ⑥ ダイジェスト生成（Gemini）
@@ -202,7 +229,7 @@ JST 12:00 (APScheduler)
 
 ### 5.1 arXiv（cs.CV / cs.LG / cs.AI / cs.CL）
 
-- API: `http://export.arxiv.org/api/query`
+- API: `https://export.arxiv.org/api/query`
 - 日付フィルタ: **JST 前日の投稿のみ**
   UTC に変換して `submittedDate:[from TO to]` でクエリ、さらに `published_date` が JST 前日かを再チェック
 - cs.CV: 優先度付きで最大40件取得（優先キーワードに一致する論文を上位に並び替え）
@@ -212,9 +239,10 @@ JST 12:00 (APScheduler)
 ### 5.2 OpenReview
 
 - API: `https://api2.openreview.net/notes`
-- 対象学会（10学会）: CVPR, NeurIPS, ICLR, ICCV, ICML, AAAI, ACL, ECCV, EMNLP, IJCAI
-- 収集基準: `tmdate`（最終更新日）が前日 JST の論文
-- ID: `openreview:{forum_id}`
+- 対象学会（6学会）: NeurIPS, ICLR, ICML, CVPR, ICCV, ECCV
+  （OpenReview 上に公開投稿があり実取得できるのは主に NeurIPS/ICLR/ICML。CVPR/ICCV/ECCV は現状非公開で将来公開時に備えて invitation テンプレートのみ定義。AAAI/ACL/EMNLP/IJCAI は公開投稿が無く常に 0 件のため除外）
+- 収集基準: 作成日 (`tcdate`) を `mintcdate`/`maxtcdate`（ミリ秒）で絞り込み、前日 JST に作成された論文
+- ID: `openreview:{note_id}`（note の `id` フィールド）
 
 ### 5.3 企業動向（自社発表）
 
@@ -224,14 +252,14 @@ JST 12:00 (APScheduler)
 
 ### 5.4 企業動向（その他報道）
 
-- ソース: BBC / CNN / Reuters / TechCrunch 等の海外大手ニュースサイト RSS
+- ソース: BBC Technology / TechCrunch / The Verge / Wired(AI) の海外ニュース RSS
 - AI 関連キーワードでフィルタリング
 - 上限15件
 
 ### 5.5 コミュニティ（Qiita / Zenn / Reddit）
 
-- **Qiita**: Qiita API v2 (`/api/v2/items`) → `tag:機械学習` / `tag:LLM` 等
-- **Zenn**: RSS フィード → `https://zenn.dev/topics/機械学習/feed`
+- **Qiita**: Qiita API v2 (`/api/v2/items`) → クエリ `tag:AI OR tag:機械学習 OR tag:LLM OR tag:生成AI created:{date}`
+- **Zenn**: RSS フィード → `https://zenn.dev/topics/{topic}/feed`（machinelearning / deeplearning / llm / ai の4トピック）
 - **Reddit**: JSON API → `r/MachineLearning` / `r/artificial` / `r/LocalLLaMA`
 
 ### 5.6 GitHub Trending
@@ -314,7 +342,7 @@ JST 12:00 (APScheduler)
 `app/services/digest.py:generate_digest()`
 
 - モデル: `gemini-3-flash-preview`（`settings.gemini_summary_model` — `.env` の `GEMINI_SUMMARY_MODEL`）
-- 入力: 全カテゴリの要約データ（要約テキスト + `[ref:safe_id]` 形式の引用タグ付き）
+- 入力: cv / lg / ai / cl / industry（自社発表）/ community / github_trending / ai_dev の8カテゴリの要約データ（要約テキスト + `[ref:safe_id]` 形式の引用タグ付き）。openreview と industry_news はダイジェスト入力の対象外
 - 出力: Markdown 形式（`summaries/YYYY-MM-DD.md`）
 
 ### 引用リンク変換（`inject_citations`）
@@ -347,7 +375,7 @@ class ArticleItem(BaseModel):
     published_date: str              # "YYYY-MM-DD"
     url: str
     pdf_url: str                     # 論文のみ
-    source_type: str                 # "arxiv" / "openreview" / "rss" / "qiita" / ...
+    source_type: Literal[...]         # "arxiv"/"openreview"/"rss"/"qiita"/"zenn"/"reddit"/"pypi"/"github_trending"/"python_news"（デフォルト "rss"）
     source_name: str                 # "OpenAI", "r/MachineLearning" 等
     tags: list[str]                  # arXiv カテゴリ等
     hashtags: list[str]              # LLM生成の内容タグ
@@ -355,7 +383,7 @@ class ArticleItem(BaseModel):
 ```
 
 **ファイル一覧（1日分）** → `data/YYYY-MM-DD/papers_{category}.json`
-`category`: `cv`, `openreview`, `lg`, `ai`, `cl`, `industry`, `industry_news`, `community`, `python`
+`category`: `cv`, `openreview`, `lg`, `ai`, `cl`, `industry`, `industry_news`, `community`, `github_trending`, `ai_dev`
 
 ### 8.2 SQLite スキーマ
 
@@ -378,12 +406,15 @@ CREATE TABLE articles (
 -- チャットセッション（1記事に複数作成可）
 CREATE TABLE chat_sessions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    article_id  TEXT NOT NULL REFERENCES articles(id),
+    article_id  TEXT REFERENCES articles(id),  -- NULL の場合は日毎（一面まとめ）チャット
+    date        TEXT,           -- "YYYY-MM-DD"（日毎チャットのみセット、is_daily 判定用）
     title       TEXT NOT NULL DEFAULT '新しいチャット',  -- LLM 自動生成
     rag_context TEXT,           -- キャッシュされた RAG コンテキスト
     created_at  DATETIME DEFAULT (CURRENT_TIMESTAMP),
     updated_at  DATETIME DEFAULT (CURRENT_TIMESTAMP)
 );
+-- article_id がセットされていれば記事チャット、article_id IS NULL かつ date NOT NULL なら日毎チャット。
+-- SQLite は ALTER COLUMN 不可のため、既存 DB は migrate_db() がテーブルを再作成して article_id の NOT NULL を解除する。
 
 -- チャットメッセージ
 CREATE TABLE chat_messages (
@@ -416,17 +447,32 @@ CREATE TABLE user_tags (
 |----------|------|------|
 | GET | `/` | トップページ（最新日のデータ） |
 | GET | `/archive/{date_str}` | 過去日付アーカイブ |
-| GET | `/summaries` | サマリー履歴一覧（最新3日分 or 全件） |
+| GET | `/summaries` | サマリー履歴一覧（10件/ページ・降順ページネーション） |
 | GET | `/summaries/{date_str}` | 個別サマリー詳細 |
 | GET | `/tags/` | タグ一覧（AI タグ + ユーザータグ混在） |
 | GET | `/tags/{tag_name}` | タグ別記事一覧 |
-| GET | `/chats` | チャット検索・一覧 |
-| POST | `/chat/{article_id}` | チャット新規作成（HTMX） |
-| GET/POST | `/chat/{session_id}/...` | チャット操作（HTMX） |
+| GET | `/chat/search` | チャット検索・一覧 |
+| GET | `/chat/{article_id}/sessions/latest` | 最新セッション取得（HTMX、なければ自動作成） |
+| POST | `/chat/{article_id}/sessions` | チャットセッション新規作成（HTMX） |
+| GET | `/chat/{article_id}/sessions/{session_id}` | セッション読み込み（HTMX） |
+| POST | `/chat/{article_id}/sessions/{session_id}/messages` | メッセージ送信（HTMX） |
+| DELETE | `/chat/{article_id}/sessions/{session_id}` | セッション削除（HTMX） |
+| GET | `/daily-chat/{date_str}/sessions/latest` | 一面まとめチャット 最新セッション取得（HTMX） |
+| POST | `/daily-chat/{date_str}/sessions` | 一面まとめチャット セッション新規作成（HTMX） |
+| POST | `/daily-chat/{date_str}/first-message` | 一面まとめチャット 初回メッセージ送信（HTMX） |
+| GET/POST/DELETE | `/daily-chat/{date_str}/sessions/{session_id}[/messages]` | 一面まとめチャット 切替・送信・削除（HTMX） |
+| GET | `/themes` | 検索テーマ一覧（HTMX） |
+| GET | `/themes/{theme_id}` | テーマ別記事一覧（日付横断） |
+| GET/POST | `/admin/themes` | テーマ一覧取得 / テーマ追加（HTMX） |
+| DELETE | `/admin/themes/{theme_id}` | テーマ削除（HTMX） |
+| POST | `/admin/themes/{theme_id}/toggle` | テーマ有効/無効切替（HTMX） |
+| POST/DELETE | `/admin/themes/{theme_id}/keywords[/{index}]` | テーマのキーワード追加/削除（HTMX） |
+| POST | `/admin/themes/{theme_id}/search` | テーマのオンデマンド検索実行 |
 | POST | `/user-tags/{article_id}` | ユーザータグ追加（HTMX、Form: `tag`） |
 | DELETE | `/user-tags/{article_id}/{tag}` | ユーザータグ削除（HTMX） |
 | POST | `/admin/run-pipeline` | パイプライン手動実行 |
 | POST | `/admin/reprocess-summaries` | 未要約アイテムの再要約 |
+| GET/POST/DELETE | `/admin/github-trending-keywords[/{keyword}]` | GitHub Trending フィルタキーワード CRUD（HTMX） |
 
 ---
 
@@ -446,6 +492,7 @@ CREATE TABLE user_tags (
    - 自社発表 / その他報道（各サブセクション）
 5. **SNS・コミュニティ**（単体セクション: Qiita / Zenn / Reddit）
 6. **GitHub Trending**（単体セクション: ソートUI付き — Daily/Weekly/Monthly/Total ★ 切替）
+7. **LLM・AIエージェント動向**（単体セクション: 公式アップデート・性能ニュース — `ai_dev`, violet スタイル）
 
 ### 10.2 記事カード（`components/article/card.html`）
 
@@ -467,7 +514,7 @@ Alpine の `@click` から `open-chat` カスタムイベントを dispatch し�
 x-data="{ showChat: false, chatLoaded: false }"
 @click="showChat=!showChat; if(showChat&&!chatLoaded){chatLoaded=true; htmx.trigger($el,'open-chat');}"
 hx-trigger="open-chat"
-hx-post="/chat/{{ item.id }}"
+hx-get="/chat/{{ item.id }}/sessions/latest"
 ```
 
 #### ID の CSS セーフ変換
@@ -567,13 +614,22 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 | `GEMINI_SEARCH_THRESHOLD` | チャット時の Google Search グラウンディング閾値（デフォルト: `0.3`、0.0=常に検索、1.0=検索しない） |
 | `SMTP_HOST` | SMTP サーバーホスト |
 | `SMTP_PORT` | SMTP ポート |
-| `SMTP_USER` | SMTP ユーザー名 |
+| `SMTP_USERNAME` | SMTP ユーザー名 |
 | `SMTP_PASSWORD` | SMTP パスワード |
-| `NOTIFY_EMAIL` | 通知先メールアドレス |
+| `SMTP_FROM` | 送信元メールアドレス |
+| `SMTP_TO` | 通知先メールアドレス |
+| `SCHEDULE_HOUR` | パイプライン自動実行の時刻（時、JST、デフォルト: `12`） |
+| `SCHEDULE_MINUTE` | パイプライン自動実行の時刻（分、デフォルト: `0`） |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit API 認証情報（コミュニティ収集用、任意） |
+| `REDDIT_USER_AGENT` | Reddit API User-Agent（デフォルト: `AI-Daily-Survey/1.0`） |
+| `QIITA_ACCESS_TOKEN` | Qiita API アクセストークン（コミュニティ収集用、任意） |
+| `GITHUB_TOKEN` | GitHub REST API トークン（GitHub Trending のレートリミット緩和 60→5000 req/h、任意） |
 | `DATA_DIR` | JSON 保存ディレクトリ（デフォルト: `./data`） |
 | `SUMMARIES_DIR` | Markdown 保存ディレクトリ（デフォルト: `./summaries`） |
 | `DB_PATH` | SQLite パス（デフォルト: `./db/survey.db`） |
 | `LOG_DIR` | ログディレクトリ（デフォルト: `./logs`） |
+
+> 注: `APP_HOST` / `APP_PORT` は `.env.example` に記載があるが `config.py` からは読み込まれない（host/port は `Dockerfile` の uvicorn CMD と `docker-compose.yml` のポートマッピングで固定）。全変数の詳細は [docs/env.md](env.md) を参照。
 
 ---
 
@@ -599,7 +655,25 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 省略時: 今日の JSON を対象
 ```
 
----
+### GitHub Trending キーワード管理（`app/main.py`）
+
+GitHub Trending の AI/LLM フィルタキーワードを CRUD する。HTMX リクエスト時は HTML フラグメント、通常時は JSON (`{"keywords": [...]}`) を返す。
+
+- `GET /admin/github-trending-keywords` — フィルタキーワード一覧を取得
+- `POST /admin/github-trending-keywords` — キーワードを追加（Form: `keyword`）
+- `DELETE /admin/github-trending-keywords/{keyword}` — キーワードを削除
+
+### 検索テーマ管理（`app/routers/themes.py`）
+
+`data/themes.json` に永続化したユーザー定義の検索テーマを CRUD し、オンデマンド検索を実行する（いずれも HTMX 対応）。
+
+- `GET /admin/themes` — テーマ一覧フラグメント
+- `POST /admin/themes` — テーマ新規作成（Form: `name`。Gemini で関連キーワードを自動生成）
+- `DELETE /admin/themes/{theme_id}` — テーマ削除
+- `POST /admin/themes/{theme_id}/toggle` — テーマの有効/無効切り替え
+- `POST /admin/themes/{theme_id}/keywords` — キーワード追加（Form: `keyword`）
+- `DELETE /admin/themes/{theme_id}/keywords/{index}` — キーワード削除
+- `POST /admin/themes/{theme_id}/search` — 指定期間（Form: `date_from` / `date_to`）でオンデマンド検索
 
 ---
 
@@ -622,8 +696,7 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 
 ### `/summaries` — サマリー履歴一覧
 
-- **最新3日分ビュー**: 直近3日分の一面まとめを縦並びでプレビュー表示
-- **全件ビュー**: 全日付を日付降順のリストで表示。各行をクリックで詳細ページへ遷移
+- **一覧ビュー**: 全一面まとめを日付降順・10件/ページでページネーション表示。各まとめのプレビュー（先頭抜粋）と「全文 →」「続きを読む →」リンクから詳細ページ（`/summaries/{date}`）へ遷移
 
 ### `/summaries/YYYY-MM-DD` — サマリー詳細
 
@@ -639,10 +712,25 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 
 指定したタグを持つ記事を全期間・全カテゴリから横断検索して表示。AI タグ・マイタグの両方を対象に検索する。
 
-### `/chats` — チャット検索・一覧
+### `/themes` — 検索テーマ一覧・管理
 
-全チャット履歴をキーワード検索・一覧表示。チャットタイトル・メッセージ内容・記事タイトルで検索可能。
+ユーザー定義の検索テーマを一覧・管理する画面。各テーマの収集論文数・最終収集日をバッジ表示する。
+
+- **テーマ作成**: テーマ名を入力すると Gemini が関連キーワードを自動生成して登録（有効テーマ数の上限あり）
+- **キーワード編集 / 有効・無効トグル**: テーマごとにキーワードを追加・削除、収集対象の切り替え（HTMX）
+- **オンデマンド検索**: 指定した収集日範囲（最大31日）でテーマ検索をバックグラウンド実行
+- 削除・トグル・キーワード操作・検索は `/admin/themes/*` エンドポイント（HTMX）で処理
+
+### `/themes/{theme_id}` — テーマ別記事一覧（日付横断）
+
+指定テーマで収集した記事を日付横断で表示。0件の日は除外し、ヒットした全日付の収集結果と合計件数を表示する。
+
+### `/chat/search` — チャット検索・一覧
+
+全チャット履歴をキーワード検索・一覧表示（チャットタイトル・メッセージ内容を対象）。結果は記事チャット（`article_id` あり）と日毎（一面まとめ）チャット（`article_id` が NULL）の2セクションに分けて表示する。
+
+> 各日のトップ/アーカイブページには **一面まとめチャット（💬 今日のチャット, `/daily-chat/{date}/...`）** があり、その日の全カテゴリ記事要約を RAG コンテキストとして横断質問できる（複数セッション切替・Google Search グラウンディング対応）。
 
 ---
 
-*最終更新: 2026-03-22 — Google Search グラウンディング統合・chat_messages スキーマ更新・GEMINI_SEARCH_THRESHOLD 追加・docs/env.md 追加を反映。*
+*最終更新: 2026-06-09 — 検索テーマ機能 / 一面まとめチャット(daily-chat) / LLM・AIエージェント動向(ai_dev) / GitHub Trending 追加、OpenReview 6学会化、ニュースソース・環境変数名・ルート表・SQLite スキーマの現行コードとの突き合わせを反映。*

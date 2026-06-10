@@ -61,7 +61,7 @@ arXiv 収集と同様に、確実なデータ取得を優先した設計:
 
 | 設定 | デフォルト | 説明 |
 |------|-----------|------|
-| `github_trending_max_results` | `20` | 各期間あたりの取得上限 |
+| `github_trending_max_results` | `10` | 各期間あたりの取得上限（各タブ10件表示） |
 | `github_trending_stale_days` | `30` | スマート再収集の閾値（日数）。この日数以内に調査済みで description 変更なしなら前回のカードを再利用する |
 | `github_trending_keywords` | AI, LLM, ML, ... | デフォルトのフィルタキーワード一覧（約30語） |
 
