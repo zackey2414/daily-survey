@@ -75,8 +75,8 @@ cp .env.example .env
 
 | 変数名 | デフォルト | 変更必要度 | 説明 |
 |--------|-----------|-----------|------|
-| `APP_HOST` | `0.0.0.0` | 原則そのまま | uvicorn のバインドアドレス。`0.0.0.0` で全インターフェースからアクセス可能 |
-| `APP_PORT` | `8000` | 原則そのまま | uvicorn のポート番号。変更する場合は `docker-compose.yml` のポートマッピングも合わせて変更する必要がある |
+| `APP_HOST` | `0.0.0.0` | 現状コードから参照されない | `.env.example` に記載が残るが `app/config.py` の `Settings` に対応フィールドが無く、どこからも読み込まれない。バインドアドレスは `Dockerfile` の uvicorn CMD（`--host 0.0.0.0`）でハードコードされており、この変数を変更しても効果はない |
+| `APP_PORT` | `8000` | 現状コードから参照されない | 同上。待ち受けポートは `Dockerfile` の CMD（`--port 8000`）でハードコードされ `docker-compose.yml` の `8000:8000` で固定。ポートを変える場合は `Dockerfile` と `docker-compose.yml` の両方を変更する |
 | `DATA_DIR` | `data` | 原則そのまま | 日次収集 JSON の保存ディレクトリ。Docker 環境ではボリュームマウントとの整合性に注意 |
 | `SUMMARIES_DIR` | `summaries` | 原則そのまま | 日次サマリー Markdown の保存ディレクトリ |
 | `DB_PATH` | `db/survey.db` | 原則そのまま | SQLite データベースファイルのパス |

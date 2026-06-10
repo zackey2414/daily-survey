@@ -140,7 +140,10 @@ def load_article_item(article: Article) -> ArticleItem | None:
         "ai",
         "cl",
         "industry",
+        "industry_news",
         "community",
+        "github_trending",
+        "ai_dev",
         "python",
     ]
     date_dirs = sorted(

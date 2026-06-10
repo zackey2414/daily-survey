@@ -1,9 +1,11 @@
 """
 チャット機能ルーター（HTMX 対応）
-- POST /chat/{article_id}/sessions          : 新規チャットセッション作成
-- GET  /chat/{article_id}/sessions/{sid}    : セッション読み込み（HTMX swap）
-- POST /chat/{article_id}/sessions/{sid}/messages : メッセージ送信
-- GET  /chat/search                         : チャット検索
+- POST   /chat/{article_id}/sessions               : 新規チャットセッション作成
+- GET    /chat/{article_id}/sessions/latest        : 最新セッション取得・自動作成
+- GET    /chat/{article_id}/sessions/{sid}         : セッション読み込み（HTMX swap）
+- POST   /chat/{article_id}/sessions/{sid}/messages: メッセージ送信
+- DELETE /chat/{article_id}/sessions/{sid}         : セッション削除
+- GET    /chat/search                              : チャット検索
 """
 
 import asyncio
