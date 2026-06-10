@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from app.jinja import templates
+from app.markdown_utils import normalize_markdown
 from app.services.digest import load_digest, list_digests, inject_citations
 from app.schemas import DailySummaryMeta
 
@@ -58,7 +59,7 @@ async def summary_detail(request: Request, date_str: str):
 
     processed = inject_citations(content, date_str, is_archive=False)
     html_content = md.markdown(
-        processed,
+        normalize_markdown(processed),
         extensions=["fenced_code", "tables", "toc", "nl2br"],
         tab_length=2,
     )

@@ -6,7 +6,9 @@ Jinja2Templates のシングルトン（フィルター登録済み）
 import markdown as markdown_lib
 from fastapi.templating import Jinja2Templates
 
+from app.markdown_utils import normalize_markdown
+
 templates = Jinja2Templates(directory="app/templates")
 templates.env.filters["markdown"] = lambda text: markdown_lib.markdown(
-    text or "", extensions=["nl2br"], tab_length=2
+    normalize_markdown(text or ""), extensions=["nl2br"], tab_length=2
 )
