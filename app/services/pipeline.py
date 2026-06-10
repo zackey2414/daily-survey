@@ -426,7 +426,8 @@ async def _run_theme_search(
 def load_daily_data(date_str: str) -> dict[str, list[ArticleItem]]:
     """
     指定日の JSON ファイルを全カテゴリ読み込み、辞書で返す。
-    キー: "cv", "lg", "ai", "cl", "industry", "community", "python"
+    キー: "cv", "openreview", "lg", "ai", "cl", "industry", "industry_news",
+          "community", "github_trending", "ai_dev"
     """
     categories = [
         "cv",
