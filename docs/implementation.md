@@ -483,16 +483,16 @@ CREATE TABLE user_tags (
 トップページ（`/` と `/archive/{date_str}`）の表示セクション（上から順）:
 
 1. **本日の一面まとめ** — Markdown レンダリング（引用リンク付き）
-2. **CV 関連論文**（親セクション）
-   - OpenReview（サブセクション）
-   - arXiv cs.CV（サブセクション）
+2. **テーマ別論文**（親セクション） — 設定テーマごとのサブトグル（その日のテーマ検索結果 `data/{date}/themes/{theme_id}.json`）。0 件のテーマは非表示。`/themes` で管理
 3. **AI 全般論文**（親セクション）
    - cs.LG / cs.AI / cs.CL（各サブセクション）
-4. **AI 企業動向**（親セクション）
+4. **LLM・AIエージェント動向**（単体セクション: 公式アップデート・性能ニュース — `ai_dev`, violet スタイル）
+5. **AI 企業動向**（親セクション）
    - 自社発表 / その他報道（各サブセクション）
-5. **SNS・コミュニティ**（単体セクション: Qiita / Zenn / Reddit）
-6. **GitHub Trending**（単体セクション: ソートUI付き — Daily/Weekly/Monthly/Total ★ 切替）
-7. **LLM・AIエージェント動向**（単体セクション: 公式アップデート・性能ニュース — `ai_dev`, violet スタイル）
+6. **SNS・コミュニティ**（単体セクション: Qiita / Zenn / Reddit）
+7. **GitHub Trending**（単体セクション: ソートUI付き — Daily/Weekly/Monthly/Total ★ 切替）
+
+> 旧「CV 関連論文」セクション（arXiv cs.CV + OpenReview）はトップページから廃止し、**テーマ別論文**に置き換えた。cs.CV / OpenReview の収集自体は継続しており（重複除去・ダイジェスト・テーマ検索のソースとして利用）、テーマにマッチした論文はテーマ別論文セクションに現れる。
 
 ### 10.2 記事カード（`components/article/card.html`）
 

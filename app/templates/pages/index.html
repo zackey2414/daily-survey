@@ -19,7 +19,7 @@
       <option value="{{ d }}" {% if d == date_str %}selected{% endif %}>{{ d }}</option>
       {% endfor %}
     </select>
-    {% set has_existing_data = digest_html or cv_papers or lg_papers or ai_papers or cl_papers or industry_items or community_items or python_items or ai_dev_items %}
+    {% set has_existing_data = digest_html or theme_collections or cv_papers or lg_papers or ai_papers or cl_papers or industry_items or community_items or python_items or ai_dev_items %}
     <button
       hx-post="/admin/run-pipeline"
       hx-vals='{"date_str": "{{ date_str }}"}'
@@ -74,26 +74,26 @@
 </div>
 {% endif %}
 
-<!-- ② CV 関連論文（親セクション） -->
-{% if cv_papers or openreview_papers %}
-<section class="mb-8" x-data="{open: false}" id="section-cv-parent"
-         data-section-icon="🖼️" data-section-title="CV 関連論文">
+<!-- ② テーマ別論文（設定テーマごとのサブトグル） -->
+{% if theme_collections %}
+<section class="mb-8" x-data="{open: false}" id="section-theme-parent"
+         data-section-icon="🎯" data-section-title="テーマ別論文">
   <!-- 大見出し -->
   <button @click="open = !open"
           class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
     <div class="w-full flex items-center justify-between relative overflow-hidden text-white px-4 sm:px-6 py-4 sm:py-5"
-         style="background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);">
+         style="background: linear-gradient(135deg, #be123c 0%, #e11d48 100%);">
       <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
       <div class="relative flex items-center gap-3">
-        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">🖼️</span>
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">🎯</span>
         <div class="text-left">
-          <h2 class="font-bold text-base sm:text-xl tracking-tight">CV 関連論文</h2>
-          <p class="text-orange-200 text-xs mt-0.5">
-            OpenReview: {{ openreview_papers|length }} 件 · arXiv cs.CV: {{ cv_papers|length }} 件
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">テーマ別論文</h2>
+          <p class="text-rose-200 text-xs mt-0.5">
+            {{ theme_collections|length }} テーマ · 合計 {{ theme_collections|sum(attribute='total') }} 件
           </p>
         </div>
       </div>
-      <span x-text="open ? '▲' : '▼'" class="relative text-orange-300 text-base"></span>
+      <span x-text="open ? '▲' : '▼'" class="relative text-rose-300 text-base"></span>
     </div>
   </button>
   <div x-show="open" x-cloak
@@ -104,16 +104,14 @@
        x-transition:leave-start="opacity-100"
        x-transition:leave-end="opacity-0"
        class="mt-2 space-y-2 pl-2">
-    {% if openreview_papers %}
-    {% set section_id = "openreview" %}{% set section_icon = "📋" %}{% set section_title = "OpenReview" %}
-    {% set items = openreview_papers %}{% set is_paper = true %}{% set subsection = true %}
+    {% for tc in theme_collections %}
+    {% set section_id = "theme-" ~ tc.theme_id %}{% set section_icon = "🔬" %}{% set section_title = tc.theme_name %}
+    {% set items = tc.items %}{% set is_paper = true %}{% set subsection = true %}
     {% include "components/article/section.html" %}
-    {% endif %}
-    {% if cv_papers %}
-    {% set section_id = "cv" %}{% set section_icon = "🖼️" %}{% set section_title = "arXiv cs.CV" %}
-    {% set items = cv_papers %}{% set is_paper = true %}{% set subsection = true %}
-    {% include "components/article/section.html" %}
-    {% endif %}
+    {% endfor %}
+    <div class="text-right pr-1 pt-0.5">
+      <a href="/themes" class="text-xs text-rose-600 hover:underline">テーマを管理 →</a>
+    </div>
   </div>
 </section>
 {% endif %}
@@ -167,7 +165,18 @@
 </section>
 {% endif %}
 
-<!-- ④ AI 企業動向（自社発表 + その他報道 を親セクションでまとめる） -->
+<!-- ④ LLM・AIエージェント動向（AI企業動向の上に配置） -->
+{% if ai_dev_items %}
+{% set section_id = "ai_dev" %}
+{% set section_icon = "🛠️" %}
+{% set section_title = "LLM・AIエージェント動向（公式アップデート・性能ニュース）" %}
+{% set items = ai_dev_items %}
+{% set is_paper = false %}
+{% set subsection = false %}
+{% include "components/article/section.html" %}
+{% endif %}
+
+<!-- ⑤ AI 企業動向（自社発表 + その他報道 を親セクションでまとめる） -->
 {% if industry_items or industry_news_items %}
 <section class="mb-8" x-data="{open: false}" id="section-industry-parent"
          data-section-icon="🏢" data-section-title="AI 企業動向">
@@ -210,7 +219,7 @@
 </section>
 {% endif %}
 
-<!-- ⑤ SNS・コミュニティ -->
+<!-- ⑥ SNS・コミュニティ -->
 {% if community_items %}
 {% set section_id = "community" %}
 {% set section_icon = "🗣️" %}
@@ -221,23 +230,12 @@
 {% include "components/article/section.html" %}
 {% endif %}
 
-<!-- ⑥ GitHub Trending -->
+<!-- ⑦ GitHub Trending -->
 {% if github_trending_items %}
 {% include "components/article/github_trending_section.html" %}
 {% endif %}
 
-<!-- ⑦ LLM・AIエージェント動向 -->
-{% if ai_dev_items %}
-{% set section_id = "ai_dev" %}
-{% set section_icon = "🛠️" %}
-{% set section_title = "LLM・AIエージェント動向（公式アップデート・性能ニュース）" %}
-{% set items = ai_dev_items %}
-{% set is_paper = false %}
-{% set subsection = false %}
-{% include "components/article/section.html" %}
-{% endif %}
-
-{% if not (cv_papers or openreview_papers or lg_papers or ai_papers or cl_papers or industry_items or industry_news_items or community_items or github_trending_items or ai_dev_items) %}
+{% if not (theme_collections or cv_papers or openreview_papers or lg_papers or ai_papers or cl_papers or industry_items or industry_news_items or community_items or github_trending_items or ai_dev_items) %}
 <div class="text-center py-20 text-gray-400">
   <p class="text-5xl mb-4">📭</p>
   <p class="text-lg font-medium text-slate-500">{{ date_str }} のデータがまだありません</p>
