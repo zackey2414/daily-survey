@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.db.models import UserTag
 from app.jinja import templates
+from app.markdown_utils import normalize_markdown
 from app.schemas import ArticleItem
 from app.services.pipeline import load_daily_data, list_available_dates
 from app.services.theme_search import load_theme_collections_for_date
@@ -80,7 +81,7 @@ async def archive_day(
     if digest_raw:
         processed = inject_citations(digest_raw, date_str, is_archive=True)
         digest_html = md.markdown(
-            processed,
+            normalize_markdown(processed),
             extensions=["fenced_code", "tables", "nl2br"],
             tab_length=2,
         )

@@ -41,6 +41,11 @@ dev = [
 [tool.mypy]
 ignore_missing_imports = true
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
 [tool.poe.tasks]
 format = "uv run ruff format ."
 lint = "uv run ruff check --fix ."
