@@ -104,6 +104,17 @@
        x-transition:leave-start="opacity-100"
        x-transition:leave-end="opacity-0"
        class="mt-2 space-y-2 pl-2">
+    {% if theme_overview_html %}
+    <div class="bg-white rounded-xl border border-rose-100 shadow-sm px-4 sm:px-5 py-4">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-base bg-rose-100 text-rose-700 p-1.5 rounded-lg leading-none">📝</span>
+        <h3 class="font-semibold text-sm sm:text-base text-rose-900">テーマ別論文まとめ</h3>
+      </div>
+      <div class="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+        {{ theme_overview_html | safe }}
+      </div>
+    </div>
+    {% endif %}
     {% for tc in theme_collections %}
     {% set section_id = "theme-" ~ tc.theme_id %}{% set section_icon = "🔬" %}{% set section_title = tc.theme_name %}
     {% set items = tc.items %}{% set is_paper = true %}{% set subsection = true %}

@@ -14,7 +14,7 @@ from typing import Literal
 import pytz
 
 from app.config import settings
-from app.schemas import ArticleItem, DailyCollection
+from app.schemas import ArticleItem, DailyCollection, ThemeCollection
 from app.services.collector.arxiv import collect_all_arxiv_serial
 from app.services.collector.openreview import collect_openreview
 from app.services.collector.industry import collect_industry
@@ -403,6 +403,7 @@ async def _run_theme_search(
     from app.services.theme_search import (
         collect_theme_from_sources,
         save_theme_collection,
+        generate_theme_overview,
     )
 
     themes = [t for t in load_themes() if t.enabled]
@@ -410,10 +411,12 @@ async def _run_theme_search(
         return
 
     logger.info(f"テーマ検索開始... ({len(themes)} 件)")
+    collected: list[ThemeCollection] = []
     for i, theme in enumerate(themes):
         try:
             tc = await collect_theme_from_sources(theme, target_date, source_items)
             save_theme_collection(collection_date_str, theme.id, tc)
+            collected.append(tc)
             report.counts[f"テーマ: {theme.name}"] = tc.total
         except Exception as e:
             errors.append(f"テーマ {theme.name}: {e}")
@@ -421,6 +424,15 @@ async def _run_theme_search(
         # テーマ間に待機を入れて arXiv API レートリミットに配慮
         if i < len(themes) - 1:
             await asyncio.sleep(3)
+
+    # テーマ別論文セクション全体の総括を生成（一面まとめと同様、LLM 生成）
+    try:
+        await generate_theme_overview(
+            collection_date_str, target_date.isoformat(), collected
+        )
+    except Exception as e:
+        errors.append(f"テーマ総括生成: {e}")
+        logger.error(f"テーマ総括生成失敗: {e}")
 
 
 def load_daily_data(date_str: str) -> dict[str, list[ArticleItem]]:

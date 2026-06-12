@@ -208,7 +208,8 @@ JST 12:00 (APScheduler)
     │
     ▼
 ⑤.5 テーマ検索（有効テーマごとに該当論文・記事を収集して保存）
-    └── data/YYYY-MM-DD/themes/{theme_id}.json に保存
+    ├── data/YYYY-MM-DD/themes/{theme_id}.json に保存
+    └── 全テーマ横断の総括を LLM 生成 → data/YYYY-MM-DD/theme_overview.md
     │
     ▼
 ⑥ ダイジェスト生成（Gemini）
@@ -483,7 +484,7 @@ CREATE TABLE user_tags (
 トップページ（`/` と `/archive/{date_str}`）の表示セクション（上から順）:
 
 1. **本日の一面まとめ** — Markdown レンダリング（引用リンク付き）
-2. **テーマ別論文**（親セクション） — 設定テーマごとのサブトグル（その日のテーマ検索結果 `data/{date}/themes/{theme_id}.json`）。0 件のテーマは非表示。`/themes` で管理
+2. **テーマ別論文**（親セクション） — 設定テーマごとのサブトグル（その日のテーマ検索結果 `data/{date}/themes/{theme_id}.json`）。0 件のテーマは非表示。`/themes` で管理。親トグルを開くと最上部に**全テーマ横断の総括要約**（`data/{date}/theme_overview.md`、LLM 生成・引用リンク付き）を表示
 3. **AI 全般論文**（親セクション）
    - cs.LG / cs.AI / cs.CL（各サブセクション）
 4. **LLM・AIエージェント動向**（単体セクション: 公式アップデート・性能ニュース — `ai_dev`, violet スタイル）
