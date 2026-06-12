@@ -455,9 +455,42 @@
 <!-- アンカーリンク処理: #article-xxx クリック時にトグルを開いてスムーズスクロール -->
 <script>
 (function () {
+  // ソートタブ（x-show="sort==='xxx'"）内の要素なら該当タブに切り替える
+  function activateSortTab(el) {
+    var sortTab = el.closest('[x-show^="sort==="]');
+    if (!sortTab || !window.Alpine) return;
+    var m = sortTab.getAttribute('x-show').match(/sort==='(\w+)'/);
+    if (!m) return;
+    var section = sortTab.closest('[x-data]');
+    if (section) {
+      try { Alpine.$data(section).sort = m[1]; } catch (e) {}
+    }
+  }
+
+  // ID重複対応: 同一IDが複数ある場合（GitHub Trending の各ソートタブなど）
+  // ソートタブ外 → 現在アクティブなソートタブ内 → 最初の候補の順で選択
+  function findBestTarget(hash) {
+    var id = hash.replace('#', '');
+    var candidates = document.querySelectorAll('[id="' + CSS.escape(id) + '"]');
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    // ソートタブ外の候補を優先
+    for (var i = 0; i < candidates.length; i++) {
+      if (!candidates[i].closest('[x-show^="sort==="]')) return candidates[i];
+    }
+    // 現在アクティブなソートタブ内の候補を優先
+    for (var i = 0; i < candidates.length; i++) {
+      var tab = candidates[i].closest('[x-show^="sort==="]');
+      if (tab && tab.style.display !== 'none') return candidates[i];
+    }
+    // どれも非表示なら最初の候補（ソートタブを切り替えて表示する）
+    return candidates[0];
+  }
+
   function openAndScrollTo(hash) {
     if (!hash || !hash.startsWith('#article-')) return;
-    var target = document.querySelector(hash);
+    var target = findBestTarget(hash);
     if (!target) return;
 
     // 祖先の Alpine x-data で open プロパティを持つ要素を収集（内→外）
@@ -479,6 +512,9 @@
     ancestors.slice().reverse().forEach(function (anc) {
       try { Alpine.$data(anc).open = true; } catch (e) {}
     });
+
+    // ソートタブ切り替え（GitHub Trending の Daily/Weekly/Monthly/Total）
+    activateSortTab(target);
 
     // スクロールオフセット: ナビ高さ + 記事が属するセクション階層のスティッキーバー高さ
     // （例: AI企業動向 + 自社発表 の2段が表示される場合はその合計）
