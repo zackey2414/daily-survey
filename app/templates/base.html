@@ -183,6 +183,14 @@
       <div class="text-center space-y-1">
         <p class="text-slate-400 text-xs font-medium tracking-wide uppercase">AI Daily Survey</p>
         <p class="text-slate-400 text-xs">毎日 正午 (JST) 自動更新</p>
+        <p class="text-slate-400 text-[11px]">
+          <span class="text-slate-400">Gemini モデル:</span>
+          要約・チャット
+          <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-500">{{ gemini_chat_model }}</code>
+          <span class="mx-0.5 text-slate-300">·</span>
+          一面まとめ
+          <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-500">{{ gemini_summary_model }}</code>
+        </p>
       </div>
     </footer>
   </div>
