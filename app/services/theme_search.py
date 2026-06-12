@@ -22,11 +22,13 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.gemini import get_client
 from app.schemas import ArticleItem, Theme, ThemeCollection
 from app.services.summarizer import summarize_items
 
 logger = logging.getLogger(__name__)
 
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 _NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -387,6 +389,95 @@ def load_theme_collections_for_date(date_str: str) -> list[ThemeCollection]:
         if tc.total > 0:
             collections.append(tc)
     return collections
+
+
+# ── テーマ別論文の総括（セクション全体の俯瞰要約）──────────────
+
+
+def _load_template(name: str) -> str:
+    path = _PROMPTS_DIR / name
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    logger.warning(f"プロンプトテンプレートが見つかりません: {path}")
+    return ""
+
+
+def _build_overview_context(theme_collections: list[ThemeCollection]) -> str:
+    """テーマ別の収集論文から、総括生成用のコンテキスト文字列を組み立てる。"""
+    sections: list[str] = []
+    for tc in theme_collections:
+        if not tc.items:
+            continue
+        lines = [f"### テーマ: {tc.theme_name} ({tc.total} 件)"]
+        for item in tc.items[:8]:  # コンテキスト長削減のため各テーマ上位8件
+            title = item.title_ja or item.title_en
+            summary = item.summary_ja or item.abstract_en[:200]
+            safe_id = item.id.replace(":", "-").replace("/", "-").replace(".", "-")
+            lines.append(f"- [ref:{safe_id}] **{title}**: {summary[:150]}")
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def save_theme_overview(collection_date_str: str, content: str) -> Path:
+    """テーマ別論文の総括 Markdown を data/{collection_date}/theme_overview.md に保存。"""
+    day_dir = settings.data_dir / collection_date_str
+    day_dir.mkdir(parents=True, exist_ok=True)
+    path = day_dir / "theme_overview.md"
+    path.write_text(content, encoding="utf-8")
+    logger.info(f"テーマ総括保存: {path}")
+    return path
+
+
+def load_theme_overview(date_str: str) -> str | None:
+    """保存済みのテーマ別論文総括 Markdown を返す（無ければ None）。"""
+    path = settings.data_dir / date_str / "theme_overview.md"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8")
+
+
+async def generate_theme_overview(
+    collection_date_str: str,
+    coverage_date_str: str,
+    theme_collections: list[ThemeCollection],
+) -> str | None:
+    """全テーマの収集論文を俯瞰する『テーマ別論文』総括を LLM 生成して保存する。
+
+    返り値は生成した Markdown。テーマ論文が 0 件、または生成失敗時は None。
+    """
+    if sum(tc.total for tc in theme_collections) == 0:
+        return None
+
+    context = _build_overview_context(theme_collections)
+    if not context.strip():
+        return None
+
+    template = _load_template("theme_overview.md")
+    if not template:
+        return None
+    prompt = template.format(coverage_date=coverage_date_str, context=context)
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: (
+                get_client()
+                .models.generate_content(
+                    model=settings.gemini_summary_model, contents=prompt
+                )
+                .text
+                or ""
+            ),
+        )
+    except Exception as e:
+        logger.error(f"テーマ総括生成失敗: {e}")
+        return None
+
+    if not result.strip():
+        return None
+
+    save_theme_overview(collection_date_str, result)
+    return result
 
 
 def load_all_theme_stats(theme_ids: list[str]) -> dict[str, dict]:

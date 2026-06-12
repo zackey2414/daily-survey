@@ -17,7 +17,10 @@ from app.jinja import templates
 from app.markdown_utils import normalize_markdown
 from app.schemas import ArticleItem
 from app.services.pipeline import load_daily_data, list_available_dates
-from app.services.theme_search import load_theme_collections_for_date
+from app.services.theme_search import (
+    load_theme_collections_for_date,
+    load_theme_overview,
+)
 from app.services.digest import load_digest, inject_citations
 
 router = APIRouter(prefix="/archive")
@@ -44,6 +47,20 @@ async def archive_day(
 
     # テーマ別論文（その日の有効テーマごとの収集結果）
     theme_collections = load_theme_collections_for_date(date_str)
+
+    # テーマ別論文セクション全体の総括（親トグルに表示）
+    theme_overview_raw = load_theme_overview(date_str)
+    if theme_overview_raw:
+        processed_overview = inject_citations(
+            theme_overview_raw, date_str, is_archive=True
+        )
+        theme_overview_html = md.markdown(
+            normalize_markdown(processed_overview),
+            extensions=["fenced_code", "tables", "nl2br"],
+            tab_length=2,
+        )
+    else:
+        theme_overview_html = None
 
     # 全記事 ID を収集してユーザータグを一括取得
     all_items = []
@@ -114,6 +131,7 @@ async def archive_day(
             "has_data": has_data,
             "digest_html": digest_html,
             "theme_collections": theme_collections,
+            "theme_overview_html": theme_overview_html,
             "cv_papers": data.get("cv", []),
             "openreview_papers": data.get("openreview", []),
             "lg_papers": data.get("lg", []),
