@@ -22,7 +22,13 @@ class Base(DeclarativeBase):
 
 async def init_db() -> None:
     """テーブルを作成する（起動時に呼び出す）"""
-    from app.db.models import Article, ChatSession, ChatMessage, UserTag  # noqa: F401
+    from app.db.models import (  # noqa: F401
+        Article,
+        ChatSession,
+        ChatMessage,
+        UserTag,
+        Favorite,
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -66,6 +72,21 @@ async def migrate_db() -> None:
                     tag VARCHAR(50) NOT NULL,
                     created_at DATETIME DEFAULT (datetime('now')),
                     UNIQUE (article_id, tag)
+                )
+            """)
+            )
+        except Exception:
+            pass
+
+        # お気に入り（1記事につき1件、article_id でユニーク）
+        try:
+            await conn.execute(
+                text("""
+                CREATE TABLE IF NOT EXISTS favorites (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    article_id VARCHAR NOT NULL REFERENCES articles(id),
+                    created_at DATETIME DEFAULT (datetime('now')),
+                    UNIQUE (article_id)
                 )
             """)
             )

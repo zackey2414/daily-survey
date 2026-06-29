@@ -16,6 +16,7 @@ from app.routers import (
     archive,
     chat,
     daily_chat,
+    favorites,
     main_page,
     summaries,
     tags,
@@ -83,6 +84,7 @@ app.include_router(chat.router)
 app.include_router(daily_chat.router)
 app.include_router(themes.router)
 app.include_router(user_tags.router)
+app.include_router(favorites.router)
 
 # 静的ファイル配信
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

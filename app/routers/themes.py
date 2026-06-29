@@ -10,9 +10,13 @@ import logging
 from datetime import date, datetime, timedelta
 
 import pytz
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.database import get_db
+from app.db.models import Favorite
 from app.jinja import templates
 from app.services import themes as themes_svc
 from app.services.theme_search import (
@@ -59,7 +63,9 @@ async def themes_page(request: Request):
 
 
 @router.get("/themes/{theme_id}", response_class=HTMLResponse)
-async def theme_detail(request: Request, theme_id: str):
+async def theme_detail(
+    request: Request, theme_id: str, db: AsyncSession = Depends(get_db)
+):
     theme = themes_svc.get_theme(theme_id)
     if theme is None:
         raise HTTPException(status_code=404, detail="テーマが見つかりません。")
@@ -67,6 +73,16 @@ async def theme_detail(request: Request, theme_id: str):
     # 「最新日を開く」折りたたみが常に実データのある最新日を指す。
     collections = [c for c in load_theme_results(theme_id) if c.items]
     total = sum(c.total for c in collections)
+
+    # 表示記事のうちお気に入り登録済みの ID を取得（スター初期状態用）
+    article_ids = [item.id for c in collections for item in c.items]
+    favorite_ids: set[str] = set()
+    if article_ids:
+        fav_stmt = select(Favorite.article_id).where(
+            Favorite.article_id.in_(article_ids)
+        )
+        favorite_ids = {row[0] for row in (await db.execute(fav_stmt)).all()}
+
     return templates.TemplateResponse(
         "pages/theme_detail.html",
         {
@@ -74,6 +90,7 @@ async def theme_detail(request: Request, theme_id: str):
             "theme": theme,
             "collections": collections,
             "total": total,
+            "favorite_ids": favorite_ids,
         },
     )
 
