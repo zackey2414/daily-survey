@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     settings.summaries_dir.mkdir(parents=True, exist_ok=True)
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.log_dir.mkdir(parents=True, exist_ok=True)
+    settings.models_dir.mkdir(parents=True, exist_ok=True)
 
     await init_db()
     await migrate_db()
@@ -182,6 +183,83 @@ async def reprocess_summaries(date_str: str | None = None):
 
     spawn(_run(), name=f"reprocess-summaries:{date_str}")
     return {"message": f"{date_str} の再要約を開始しました（バックグラウンド実行）"}
+
+
+@app.post("/admin/generate-english")
+async def generate_english(request: Request, date_str: str | None = None):
+    """指定日の一面まとめ「英語版」を生成する（過去日もオンデマンド生成可）。
+
+    収集済み JSON を読み込み、その日の最重要トピック1本を英語化して
+    summaries/{date}.en.json に保存する。バックグラウンド実行。
+    """
+    from datetime import datetime
+    import pytz
+    from app.services.pipeline import load_daily_data
+    from app.services.english_digest import generate_english_digest
+    from app.services.tasks import spawn
+
+    JST = pytz.timezone("Asia/Tokyo")
+
+    # HTMX のフォームデータを優先的に取得
+    if not date_str and "hx-request" in request.headers:
+        try:
+            form = await request.form()
+            date_str = str(form.get("date_str", "")) or None
+        except Exception:
+            pass
+    if not date_str:
+        date_str = datetime.now(JST).date().isoformat()
+
+    from app.services.tts import synthesize_english_audio
+
+    ds: str = date_str
+    data = load_daily_data(ds)
+
+    async def _gen_text_and_audio() -> None:
+        path = await generate_english_digest(ds, data)
+        if path:
+            # 英文が生成できたら続けてローカル TTS で音声(mp3)も生成
+            await synthesize_english_audio(ds)
+
+    spawn(_gen_text_and_audio(), name=f"generate-english:{ds}")
+
+    msg = f"{ds} の英語版を生成開始しました（音声も続けて生成します。少し待ってから再読み込みしてください）"
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(f'<span class="text-emerald-600 text-xs">✓ {msg}</span>')
+    return {"message": msg}
+
+
+@app.post("/admin/generate-english-audio")
+async def generate_english_audio(request: Request, date_str: str | None = None):
+    """既存の英語版から音声(mp3)だけを生成する（ページの「音声を生成」ボタン用）。"""
+    from datetime import datetime
+    import pytz
+    from app.services.tts import synthesize_english_audio
+    from app.services.tasks import spawn
+
+    JST = pytz.timezone("Asia/Tokyo")
+
+    if not date_str and "hx-request" in request.headers:
+        try:
+            form = await request.form()
+            date_str = str(form.get("date_str", "")) or None
+        except Exception:
+            pass
+    if not date_str:
+        date_str = datetime.now(JST).date().isoformat()
+
+    spawn(
+        synthesize_english_audio(date_str),
+        name=f"generate-english-audio:{date_str}",
+    )
+    msg = f"{date_str} の音声を生成開始しました（数十秒ほどで完成します。完成後に再読み込みしてください）"
+    if "hx-request" in request.headers:
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(f'<span class="text-emerald-600 text-xs">✓ {msg}</span>')
+    return {"message": msg}
 
 
 def _render_keywords_html(keywords: list[str]) -> str:

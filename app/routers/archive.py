@@ -7,7 +7,7 @@ import markdown as md
 import pytz
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,8 @@ from app.services.theme_search import (
     load_theme_overview,
 )
 from app.services.digest import load_digest, inject_citations
+from app.services.english_digest import english_digest_exists, load_english_digest
+from app.services.tts import audio_path, english_audio_exists
 
 router = APIRouter(prefix="/archive")
 JST = pytz.timezone("Asia/Tokyo")
@@ -149,7 +151,56 @@ async def archive_day(
             "ai_dev_items": data.get("ai_dev", []),
             "available_dates": available_dates,
             "user_tags_by_id": user_tags_by_id,
+            # 英語版（英語多読）が生成済みかどうか（まとめヘッダーの「英語版 →」表示用）
+            "english_available": english_digest_exists(date_str),
         },
+    )
+
+
+@router.get("/{date_str}/en", response_class=HTMLResponse)
+async def archive_day_english(request: Request, date_str: str):
+    """一面まとめの英語版（英語多読ページ）。
+
+    未生成なら生成ボタン付きの案内を表示する（DB 参照は不要）。
+    """
+    try:
+        date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+        )
+
+    eng = load_english_digest(date_str)
+    audio_av = english_audio_exists(date_str)
+    # 再生成された音声がブラウザキャッシュで古いまま再生されないよう、mtime を
+    # クエリに付けてキャッシュバスティングする。
+    audio_mtime = int(audio_path(date_str).stat().st_mtime) if audio_av else 0
+    return templates.TemplateResponse(
+        "pages/english_digest.html",
+        {
+            "request": request,
+            "date_str": date_str,
+            "eng": eng,
+            "audio_available": audio_av,
+            "audio_mtime": audio_mtime,
+        },
+    )
+
+
+@router.get("/{date_str}/en/audio")
+async def archive_day_english_audio(date_str: str):
+    """英語版の音声(mp3)を配信する。"""
+    try:
+        date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+        )
+    path = audio_path(date_str)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="音声がまだ生成されていません。")
+    return FileResponse(
+        str(path), media_type="audio/mpeg", filename=f"{date_str}-en.mp3"
     )
 
 

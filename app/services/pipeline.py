@@ -24,6 +24,8 @@ from app.services.collector.github_trending import collect_github_trending
 from app.services.collector.ai_dev import collect_ai_dev
 from app.services.summarizer import summarize_items
 from app.services.digest import generate_digest, load_digest
+from app.services.english_digest import generate_english_digest
+from app.services.tts import synthesize_english_audio
 from app.services.notifier import CollectionReport, send_completion_email
 
 logger = logging.getLogger(__name__)
@@ -298,6 +300,32 @@ async def run_daily_pipeline(collection_date: date | None = None) -> None:
     except Exception as e:
         errors.append(f"ダイジェスト生成: {e}")
         logger.error(f"ダイジェスト生成失敗: {e}")
+
+    # ── 4.5. 一面まとめ英語版（英語多読用）生成 ────────────────
+    # その日の最重要トピック1本を学術英語化。失敗してもパイプラインは止めない。
+    logger.info("英語版（一面まとめ）生成開始...")
+    try:
+        en_path = await generate_english_digest(
+            collection_date_str,
+            {
+                "cv": cv_arxiv_papers,
+                "openreview": openreview_items,
+                "lg": lg_papers,
+                "ai": ai_papers,
+                "cl": cl_papers,
+                "ai_dev": ai_dev_items,
+                "industry": industry_items,
+                "community": community_items,
+                "github_trending": github_trending_items,
+            },
+        )
+        # 英語版が生成できたらローカル TTS で音声(mp3)も生成（バックグラウンド・非致命）
+        if en_path:
+            logger.info("英語版の音声合成開始...")
+            await synthesize_english_audio(collection_date_str)
+    except Exception as e:
+        errors.append(f"英語版生成: {e}")
+        logger.error(f"英語版生成失敗: {e}")
 
     # ── 5. メール通知 ───────────────────────────────────────────
     report.errors = errors

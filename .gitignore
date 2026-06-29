@@ -27,6 +27,9 @@ logs/*
 !logs/.gitkeep
 summaries/*
 !summaries/.gitkeep
+# ローカル TTS モデルキャッシュ（大容量バイナリ。初回起動時に自動ダウンロード）
+models/*
+!models/.gitkeep
 
 # OS
 .DS_Store

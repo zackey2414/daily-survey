@@ -102,3 +102,43 @@ class ThemeCollection(BaseModel):
 
     def model_post_init(self, __context) -> None:
         self.total = len(self.items)
+
+
+class EnglishChunk(BaseModel):
+    """英文を意味のまとまり（チャンク）で区切った1単位。
+
+    t を半角スペースで連結すると元の文 (EnglishSentence.en) に概ね一致する。
+    機能語（the/of/and 等）は g を空にして「語義なし（タップ不可）」とする。
+    """
+
+    t: str  # 英語チャンク（句読点は直前チャンク末尾に付ける）
+    g: str = ""  # 日本語語義（赤シートで表示）。空文字なら語義なし
+
+
+class EnglishSentence(BaseModel):
+    """英文1文と、その全訳・チャンク語義。"""
+
+    en: str  # 英文（通し読み用のフォールバック）
+    ja: str = ""  # 文全体の日本語訳（赤シートで表示）
+    chunks: list[EnglishChunk] = Field(default_factory=list)
+
+
+class EnglishParagraph(BaseModel):
+    """段落（文のまとまり）。"""
+
+    sentences: list[EnglishSentence] = Field(default_factory=list)
+
+
+class EnglishDigest(BaseModel):
+    """一面まとめの英語版（英語多読用）。summaries/{date}.en.json に保存。
+
+    その日の最重要トピック1本を、有名論文のような明瞭な学術英語で書き起こし、
+    文単位の全訳とチャンク単位の語義を付与したもの。
+    """
+
+    date: str  # "YYYY-MM-DD"（収集実行日）
+    topic_title: str = ""  # 取り上げたトピックの英語タイトル
+    reading_minutes: int = 0  # 想定読了時間（分）
+    model: str = ""  # 生成に使った Gemini モデル名
+    generated_at: str = ""  # ISO 8601 (JST)
+    paragraphs: list[EnglishParagraph] = Field(default_factory=list)

@@ -44,6 +44,11 @@ class Settings:
     summaries_dir: Path = Path(os.getenv("SUMMARIES_DIR", "summaries"))
     db_path: Path = Path(os.getenv("DB_PATH", "db/survey.db"))
     log_dir: Path = Path(os.getenv("LOG_DIR", "logs"))
+    models_dir: Path = Path(os.getenv("MODELS_DIR", "models"))
+
+    # ローカル TTS（英語版の音声合成。Kokoro-82M を onnxruntime で実行 = API 課金なし）
+    kokoro_voice: str = os.getenv("KOKORO_VOICE", "af_heart")
+    kokoro_speed: float = float(os.getenv("KOKORO_SPEED", "1.0"))
 
     # 収集設定
     arxiv_max_results: int = 20
