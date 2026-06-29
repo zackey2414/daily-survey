@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ date_str }} 英語版 — AI Daily Survey{% endblock %}
+
+{% block content %}
+<style>
+  /* 英語多読ページ専用スタイル（赤シート式の語義・全訳表示） */
+  .eng-line {
+    font-family: Georgia, 'Times New Roman', 'Noto Serif JP', serif;
+    font-size: 1.05rem;
+    line-height: 2.0;
+    color: #1f2937;
+  }
+  .eng-sentence { margin: 0.15rem 0; }
+  .eng-para { margin-bottom: 1.25rem; }
+
+  /* 語義ありチャンク: 既定は点線下線のみ（語義は隠す）。タップ/全体表示で〔語義〕を inline 表示 */
+  .chunk { cursor: pointer; }
+  .chunk .surf { border-bottom: 1px dotted #94a3b8; }
+  .chunk:hover .surf { border-bottom-color: #2563eb; }
+  .chunk .gloss { display: none; }
+  .chunk.open .surf { border-bottom-color: #2563eb; color: #1d4ed8; }
+  .chunk.open .gloss {
+    display: inline;
+    color: #1d4ed8;
+    font-size: 0.82em;
+    font-family: 'Noto Sans JP', sans-serif;
+    margin: 0 0.1em;
+  }
+  .chunk.open .gloss::before { content: "\3014"; }  /* 〔 */
+  .chunk.open .gloss::after  { content: "\3015"; }  /* 〕 */
+
+  /* 文末の「訳」トグル */
+  .ja-toggle {
+    font-size: 0.65rem;
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    padding: 0 0.5rem;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .ja-toggle:hover { background: #e2e8f0; color: #334155; }
+
+  /* 文単位の全訳: 既定は隠す。show-ja で表示 */
+  .ja-trans {
+    display: none;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.9rem;
+    color: #475569;
+    background: #f8fafc;
+    border-left: 3px solid #cbd5e1;
+    padding: 0.35rem 0.6rem;
+    margin: 0.25rem 0 0.5rem;
+    border-radius: 0 0.4rem 0.4rem 0;
+    line-height: 1.7;
+  }
+  .eng-sentence.show-ja .ja-trans { display: block; }
+</style>
+
+<!-- ページヘッダー -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+  <div>
+    <a href="/archive/{{ date_str }}" class="text-xs text-indigo-600 hover:underline">← 日本語版へ戻る</a>
+    <h1 class="text-2xl font-bold text-slate-800 tracking-tight mt-1">一面まとめ（英語版）</h1>
+    <p class="text-slate-400 text-xs mt-1">
+      {{ date_str }}
+      {% if eng and eng.reading_minutes %}<span class="mx-1.5">·</span>約 {{ eng.reading_minutes }} 分で読了{% endif %}
+      <span class="mx-1.5">·</span>英文読解の練習用
+    </p>
+  </div>
+</div>
+
+{% if eng and eng.paragraphs %}
+<section x-data="{showGloss: false, showJa: false}"
+         class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+  <!-- まとめヘッダー + 全体トグル -->
+  <div class="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+       style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-xl bg-white/15 p-2 rounded-xl leading-none">📖</span>
+      <h2 class="font-bold text-base sm:text-lg text-white tracking-tight truncate">
+        {{ eng.topic_title or "Today's Reading" }}
+      </h2>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" @click="showGloss = !showGloss"
+              class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+              :class="showGloss ? 'bg-blue-500 text-white' : 'bg-white/15 text-blue-100 hover:bg-white/25'">
+        <span x-text="showGloss ? '語義を隠す' : '語義を表示'"></span>
+      </button>
+      <button type="button" @click="showJa = !showJa"
+              class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+              :class="showJa ? 'bg-emerald-500 text-white' : 'bg-white/15 text-emerald-100 hover:bg-white/25'">
+        <span x-text="showJa ? '全訳を隠す' : '全訳を表示'"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 音声プレーヤー（ページ上部） -->
+  <div class="px-5 sm:px-6 pt-4">
+    {% if audio_available %}
+    <audio controls preload="none" class="w-full"
+           src="/archive/{{ date_str }}/en/audio?v={{ audio_mtime }}"></audio>
+    {% else %}
+    <div x-data class="flex items-center gap-2 flex-wrap">
+      <button
+        hx-post="/admin/generate-english-audio"
+        hx-vals='{"date_str": "{{ date_str }}"}'
+        hx-target="#audio-status" hx-swap="innerHTML"
+        class="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors">
+        🔊 音声を生成（ローカル TTS）
+      </button>
+      <span class="text-[11px] text-slate-400">英文全体の音声を作成します（数十秒）</span>
+      <span id="audio-status" class="text-xs text-slate-500"></span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 使い方ヒント -->
+  <p class="px-5 sm:px-6 pt-3 text-[11px] text-slate-400">
+    点線の語句に触れると<span class="text-blue-600">語義</span>、文末の「訳」で<span class="text-emerald-600">全訳</span>が出ます。まずは英文だけで読んでみましょう。
+  </p>
+
+  <!-- 本文 -->
+  <div class="px-5 sm:px-6 py-4 sm:py-5 max-w-3xl">
+    {% for para in eng.paragraphs %}
+    <div class="eng-para">
+      {% for s in para.sentences %}
+      <div class="eng-sentence" x-data="{ja: false}" :class="{'show-ja': ja || showJa}">
+        <p class="eng-line">
+          {%- for c in s.chunks -%}
+            {%- if not loop.first and c.t[:1] not in ',.;:!?)]}' %} {% endif -%}
+            {%- if c.g -%}
+              <span class="chunk" x-data="{o: false}" @click="o = !o" :class="{open: o || showGloss}"><span class="surf">{{ c.t }}</span><span class="gloss">{{ c.g }}</span></span>
+            {%- else -%}
+              <span class="plain">{{ c.t }}</span>
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if not s.chunks %}{{ s.en }}{% endif -%}
+          {% if s.ja %}<button type="button" class="ja-toggle" @click="ja = !ja">訳</button>{% endif %}
+        </p>
+        {% if s.ja %}<p class="ja-trans">{{ s.ja }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="px-5 sm:px-6 pb-4 text-right">
+    <span class="text-[11px] text-slate-400">生成モデル: <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-500">{{ eng.model }}</code></span>
+  </div>
+</section>
+{% else %}
+<!-- 未生成 -->
+<div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+  <div class="px-6 py-12 text-center" x-data>
+    <div class="text-4xl mb-4">📖</div>
+    <h2 class="text-lg font-bold text-slate-700 mb-2">{{ date_str }} の英語版はまだありません</h2>
+    <p class="text-slate-400 text-sm mb-5">
+      その日の最も重要なトピックを、論文のような明瞭な英語で書き起こします。<br>
+      生成には少し時間がかかります（バックグラウンド実行）。
+    </p>
+    <button
+      hx-post="/admin/generate-english"
+      hx-vals='{"date_str": "{{ date_str }}"}'
+      hx-target="#gen-status"
+      hx-swap="innerHTML"
+      class="inline-flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors shadow-sm">
+      ✦ 英語版を生成
+    </button>
+    <div id="gen-status" class="mt-3 text-xs text-slate-500"></div>
+    <p class="mt-4">
+      <a href="/archive/{{ date_str }}" class="text-xs text-indigo-600 hover:underline">← 日本語版へ戻る</a>
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

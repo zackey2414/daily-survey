@@ -17,14 +17,15 @@ RUN pip install uv
 # uv.lock があれば利用し、なければ pyproject.toml から生成する
 # --no-install-project: Webアプリのためプロジェクト自体はビルド不要
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --no-install-project
+# tts グループ（kokoro-onnx 等）も含めてインストール（ローカル TTS 音声合成用）
+RUN uv sync --no-dev --group tts --no-install-project
 
 # アプリケーションコードのコピー
 COPY app/ ./app/
 COPY prompts/ ./prompts/
 
 # 必要なディレクトリを作成し、実行ユーザー(1001)に権限を付与
-RUN mkdir -p data summaries db logs && chown -R 1001:1001 /app
+RUN mkdir -p data summaries db logs models && chown -R 1001:1001 /app
 
 EXPOSE 8000
 

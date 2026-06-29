@@ -70,6 +70,8 @@ everyday-survey/
 │   │   ├── pipeline.py            # 日次パイプライン統括（収集→要約→保存→通知）
 │   │   ├── summarizer.py          # Gemini 要約処理
 │   │   ├── digest.py              # 一面まとめ生成・保存 + inject_citations
+│   │   ├── english_digest.py      # 一面まとめ英語版生成（flash-lite で英文＋文訳＋チャンク語義の JSON 生成・保存）
+│   │   ├── tts.py                 # 英語版の音声合成（ローカル Kokoro-onnx → mp3。モデル自動DL・バックグラウンド実行）
 │   │   ├── notifier.py            # SMTP メール通知
 │   │   ├── rag.py                 # チャット用 URL フェッチ・RAG コンテキスト構築
 │   │   ├── themes.py              # 検索テーマ管理（data/themes.json 永続化・Gemini キーワード自動生成）
@@ -93,6 +95,7 @@ everyday-survey/
 │       ├── base.html              # 共通レイアウト（ナビ・スティッキーバー JS・引用スクロール JS）
 │       ├── pages/
 │       │   ├── index.html         # トップページ（今日の一面）
+│       │   ├── english_digest.html # 一面まとめ英語版（赤シート式の英語多読ページ、GET /archive/{date}/en）
 │       │   ├── summaries.html     # サマリー履歴一覧
 │       │   ├── summary_detail.html # 個別サマリー詳細
 │       │   ├── tags_list.html     # タグ一覧
@@ -138,8 +141,12 @@ everyday-survey/
 │       └── themes/
 │           └── {theme_id}.json    # テーマ検索結果（ThemeCollection）
 │
-├── summaries/                     # 日次一面まとめ（Markdown）
-│   └── YYYY-MM-DD.md
+├── summaries/                     # 日次一面まとめ
+│   ├── YYYY-MM-DD.md              # 日本語の一面まとめ（Markdown）
+│   ├── YYYY-MM-DD.en.json         # 一面まとめ英語版（英語多読用の構造化 JSON）
+│   └── YYYY-MM-DD.en.mp3          # 一面まとめ英語版の音声（ローカル TTS で合成）
+│
+├── models/                        # ローカル TTS モデルキャッシュ（Kokoro, 初回自動DL）
 │
 ├── db/
 │   └── survey.db                  # SQLite データベース
@@ -218,6 +225,16 @@ JST 12:00 (APScheduler)
     ▼
 ⑥ ダイジェスト生成（Gemini）
     └── summaries/YYYY-MM-DD.md に保存
+    │
+    ▼
+⑥.5 一面まとめ英語版生成（Gemini flash-lite, best-effort）
+    └── その日の最重要トピック1本を学術英語化し、文訳・チャンク語義付き JSON を
+        summaries/YYYY-MM-DD.en.json に保存（失敗してもパイプラインは継続）
+    │
+    ▼
+⑥.6 英語版の音声合成（ローカル TTS Kokoro-onnx, best-effort）
+    └── 英文全体を mp3 化して summaries/YYYY-MM-DD.en.mp3 に保存
+        （API 不使用＝課金なし。models/ のモデルは初回自動ダウンロード）
     │
     ▼
 ⑦ メール通知（SMTP）

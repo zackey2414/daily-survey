@@ -45,10 +45,16 @@
 <!-- ① 一面まとめ -->
 {% if digest_html %}
 <section class="mb-10 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-  <div class="flex items-center gap-3 px-5 sm:px-6 py-4"
+  <div class="flex items-center justify-between gap-3 px-5 sm:px-6 py-4"
        style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);">
-    <span class="text-xl bg-white/15 p-2 rounded-xl leading-none">🗞️</span>
-    <h2 class="font-bold text-lg text-white tracking-tight">本日の一面まとめ</h2>
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-xl bg-white/15 p-2 rounded-xl leading-none">🗞️</span>
+      <h2 class="font-bold text-lg text-white tracking-tight">本日の一面まとめ</h2>
+    </div>
+    <a href="/archive/{{ date_str }}/en"
+       class="shrink-0 text-xs font-medium text-blue-100 bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition-colors">
+      英語版 →
+    </a>
   </div>
   <div class="px-4 sm:px-6 py-5 sm:py-6 prose prose-blue max-w-none text-gray-800 leading-relaxed">
     {{ digest_html | safe }}

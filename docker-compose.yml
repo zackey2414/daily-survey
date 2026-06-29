@@ -12,6 +12,7 @@ services:
       - ./logs:/app/logs
       - ./app:/app/app  # 開発時のホットリロード用
       - ./prompts:/app/prompts  # プロンプトテンプレート
+      - ./models:/app/models  # ローカル TTS（Kokoro）モデルキャッシュの永続化
     user: "1001:1001"
     env_file:
       - .env
