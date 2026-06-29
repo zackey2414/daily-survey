@@ -5,6 +5,7 @@
 -->
 {% set safe_id = item.id | replace(':', '-') | replace('/', '-') | replace('.', '-') %}
 {% set item_user_tags = user_tags_by_id.get(item.id, []) if user_tags_by_id is defined else [] %}
+{% set is_favorite = favorite_ids is defined and item.id in favorite_ids %}
 <div class="bg-white rounded-2xl shadow-sm card overflow-hidden ring-1 ring-gray-100/80"
      id="article-{{ safe_id }}"
      x-data="{ showSummary: false, showChat: false, chatLoaded: false, deleteMode: false, showTagPanel: false }">
@@ -126,8 +127,10 @@
 
       </div>
 
-      <!-- 外部リンクボタン -->
+      <!-- お気に入りスター + 外部リンクボタン -->
       <div class="flex flex-col items-end gap-1.5 shrink-0">
+        {% set article_id = item.id %}
+        {% include "components/favorite/star.html" %}
         {% if item.pdf_url %}
         <a href="{{ item.pdf_url }}" target="_blank" rel="noopener"
            class="text-xs font-semibold bg-red-50 text-red-600 ring-1 ring-red-100 px-3 py-1 rounded-full hover:bg-red-100 transition-colors">

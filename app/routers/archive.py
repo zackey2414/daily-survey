@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.db.models import UserTag
+from app.db.models import Favorite, UserTag
 from app.jinja import templates
 from app.markdown_utils import normalize_markdown
 from app.schemas import ArticleItem
@@ -93,6 +93,15 @@ async def archive_day(
         for ut in result.scalars().all():
             user_tags_by_id.setdefault(ut.article_id, []).append(ut.tag)
 
+    # 表示記事のうちお気に入り登録済みの ID を一括取得
+    favorite_ids: set[str] = set()
+    if article_ids:
+        fav_stmt = select(Favorite.article_id).where(
+            Favorite.article_id.in_(article_ids)
+        )
+        fav_result = await db.execute(fav_stmt)
+        favorite_ids = {row[0] for row in fav_result.all()}
+
     # ダイジェスト（引用リンク注入）
     digest_raw = load_digest(date_str)
     if digest_raw:
@@ -149,6 +158,7 @@ async def archive_day(
             "ai_dev_items": data.get("ai_dev", []),
             "available_dates": available_dates,
             "user_tags_by_id": user_tags_by_id,
+            "favorite_ids": favorite_ids,
         },
     )
 

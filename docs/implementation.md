@@ -63,7 +63,8 @@ everyday-survey/
 │   │   ├── daily_chat.py          # 一面まとめチャット API（/daily-chat/{date_str}/...）
 │   │   ├── themes.py              # 検索テーマ管理（GET /themes, /admin/themes/...）
 │   │   ├── tags.py                # GET /tags/, /tags/{tag_name}
-│   │   └── user_tags.py           # POST/DELETE /user-tags/{article_id}
+│   │   ├── user_tags.py           # POST/DELETE /user-tags/{article_id}
+│   │   └── favorites.py           # GET /favorites/ , POST /favorites/{article_id}（トグル）
 │   │
 │   ├── services/
 │   │   ├── pipeline.py            # 日次パイプライン統括（収集→要約→保存→通知）
@@ -86,7 +87,7 @@ everyday-survey/
 │   │
 │   ├── db/
 │   │   ├── database.py            # SQLAlchemy async セッション・init_db・migrate_db
-│   │   └── models.py              # ORM モデル（Article, ChatSession, ChatMessage, UserTag）
+│   │   └── models.py              # ORM モデル（Article, ChatSession, ChatMessage, UserTag, Favorite）
 │   │
 │   └── templates/
 │       ├── base.html              # 共通レイアウト（ナビ・スティッキーバー JS・引用スクロール JS）
@@ -96,6 +97,7 @@ everyday-survey/
 │       │   ├── summary_detail.html # 個別サマリー詳細
 │       │   ├── tags_list.html     # タグ一覧
 │       │   ├── tags.html          # タグ別記事一覧
+│       │   ├── favorites.html     # お気に入り記事一覧（GET /favorites/）
 │       │   ├── themes_list.html   # 検索テーマ一覧 + 管理 UI（GET /themes）
 │       │   ├── theme_detail.html  # テーマ別の収集結果（日付横断、GET /themes/{theme_id}）
 │       │   ├── chat_search.html   # チャット検索
@@ -103,7 +105,7 @@ everyday-survey/
 │       └── components/
 │           ├── article/
 │           │   ├── section.html   # セクション（折りたたみトグル）
-│           │   ├── card.html      # 記事カード（要約・チャット・タグ UI）
+│           │   ├── card.html      # 記事カード（要約・チャット・タグ・お気に入り UI）
 │           │   └── github_trending_section.html # GitHub Trending セクション（ソートUI付き）
 │           ├── chat/
 │           │   ├── panel.html     # 記事チャットパネル（インライン展開）
@@ -112,6 +114,8 @@ everyday-survey/
 │           │   └── message_item.html
 │           ├── tags/
 │           │   └── user_tags.html # ユーザータグ一覧 HTML（HTMX スワップ対象）
+│           ├── favorite/
+│           │   └── star.html      # お気に入りスター（HTMX outerHTML スワップ対象）
 │           └── theme/
 │               ├── list.html      # 検索テーマ一覧（HTMX スワップ対象）
 │               └── keywords.html  # テーマ別キーワード編集 HTML
@@ -388,11 +392,11 @@ class ArticleItem(BaseModel):
 
 ### 8.2 SQLite スキーマ
 
-チャット機能とユーザータグの永続化に使用。
+チャット機能・ユーザータグ・お気に入りの永続化に使用。
 `db/survey.db`（SQLAlchemy async + aiosqlite）
 
 ```sql
--- 記事テーブル（チャットとユーザータグの紐付け用・on-demand 登録）
+-- 記事テーブル（チャット・ユーザータグ・お気に入りの紐付け用・on-demand 登録）
 CREATE TABLE articles (
     id          TEXT PRIMARY KEY,   -- "arxiv:2603.12345v1"
     date        TEXT NOT NULL,      -- "YYYY-MM-DD"（収集日）
@@ -436,6 +440,14 @@ CREATE TABLE user_tags (
     created_at  DATETIME DEFAULT (CURRENT_TIMESTAMP),
     UNIQUE(article_id, tag)
 );
+
+-- お気に入り（1記事につき1件、article_id でユニーク）
+CREATE TABLE favorites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id  TEXT NOT NULL REFERENCES articles(id),
+    created_at  DATETIME DEFAULT (CURRENT_TIMESTAMP),
+    UNIQUE(article_id)
+);
 ```
 
 **Article の on-demand 登録**: パイプライン実行時に全記事を登録するほか、チャットやタグ追加で DB に未登録の記事があった場合は JSON ファイルを走査して自動登録する。
@@ -452,6 +464,7 @@ CREATE TABLE user_tags (
 | GET | `/summaries/{date_str}` | 個別サマリー詳細 |
 | GET | `/tags/` | タグ一覧（AI タグ + ユーザータグ混在） |
 | GET | `/tags/{tag_name}` | タグ別記事一覧 |
+| GET | `/favorites/` | お気に入り記事一覧（全期間・全カテゴリ横断） |
 | GET | `/chat/search` | チャット検索・一覧 |
 | GET | `/chat/{article_id}/sessions/latest` | 最新セッション取得（HTMX、なければ自動作成） |
 | POST | `/chat/{article_id}/sessions` | チャットセッション新規作成（HTMX） |
@@ -471,6 +484,7 @@ CREATE TABLE user_tags (
 | POST | `/admin/themes/{theme_id}/search` | テーマのオンデマンド検索実行 |
 | POST | `/user-tags/{article_id}` | ユーザータグ追加（HTMX、Form: `tag`） |
 | DELETE | `/user-tags/{article_id}/{tag}` | ユーザータグ削除（HTMX） |
+| POST | `/favorites/{article_id}` | お気に入りトグル（HTMX、スター自身を outerHTML 入れ替え） |
 | POST | `/admin/run-pipeline` | パイプライン手動実行 |
 | POST | `/admin/reprocess-summaries` | 未要約アイテムの再要約 |
 | GET/POST/DELETE | `/admin/github-trending-keywords[/{keyword}]` | GitHub Trending フィルタキーワード CRUD（HTMX） |
@@ -499,6 +513,7 @@ CREATE TABLE user_tags (
 
 各記事カードの構成:
 - タイトル（日本語 + 英語）、ソース・日付バッジ、元リンク
+- **お気に入りスター** (右上、`amber` スタイル、HTMX トグル)
 - **AI ハッシュタグ** (`indigo` スタイル) + **ユーザータグ** (`emerald` スタイル)
 - 要約パネル（Alpine.js `x-show` で折りたたみ）:
   - 日本語概要 / 新規性・貢献（論文）/ ポイント（記事・企業動向）
@@ -506,6 +521,7 @@ CREATE TABLE user_tags (
   - **定量指標**（企業動向のみ、amber ボックス）: ベンチマーク名・スコア・従来手法比
 - チャットパネル（HTMX でインライン展開、セッション切り替え可）
 - ユーザータグ操作（追加フォーム / 削除モードトグル）
+- お気に入りトグル（★ クリックで `POST /favorites/{article_id}` → スター自身を `outerHTML` 入れ替え）
 
 #### チャット HTMX パターン
 
@@ -600,6 +616,16 @@ stickyOffset += sectionStack.length >= 2 ? 40 : 8;  // バッファ
 - **削除モード**: Alpine の `deleteMode` フラグで × ボタンを表示/非表示
 - **削除**: `hx-delete` で `DELETE /user-tags/{article_id}/{tag}` → 同じくスワップ
 - バリデーション: 50文字以内、`^[\w\u3000-\u9FFF\-]+$` パターン（サーバサイド）
+
+### 10.6 お気に入り（HTMX）
+
+- **トグル**: 記事カード右上の ★ から `POST /favorites/{article_id}` → スターボタン自身を `outerHTML` で入れ替え（`hx-swap="outerHTML"` / `hx-disabled-elt="this"` で二重送信防止）
+- サーバ側はその記事のお気に入り有無を反転（登録/解除）し、更新後のスターHTML（`components/favorite/star.html`）を返す
+- 登録時、`articles` に未登録の記事は `user_tags.py` の `_get_or_create_article()` が JSON から復元して登録（FK 用）
+- 保存: `favorites` テーブル（`article_id` でユニーク）
+- 一覧: `GET /favorites/` がタグ別ページと同じカテゴリ別レイアウトで全期間横断表示（テーマ別論文を含む）
+- テーマ別検索のみで取得した論文（`papers_*.json` に無い）も `_get_or_create_article()` が `data/{date}/themes/*.json` を走査して登録できる（タグ機能と共通）
+- **既知の制限**: 同一記事が複数描画される箇所（GitHub Trending の Daily/Weekly/Monthly/Total タブ、テーマ別論文とメインカテゴリの重複）では `id="fav-star-{safe_id}"` が重複する。`outerHTML` スワップはクリックしたボタンのみ更新するため、他タブの同記事スターはリロードまで表示が古いまま（永続化は正しく行われる）。これは既存の `article-`/`chat-panel-`/`user-tags-` 重複IDと同じ制約。
 
 ---
 
@@ -712,6 +738,10 @@ GitHub Trending の AI/LLM フィルタキーワードを CRUD する。HTMX リ
 ### `/tags/{tag_name}` — タグ別記事一覧
 
 指定したタグを持つ記事を全期間・全カテゴリから横断検索して表示。AI タグ・マイタグの両方を対象に検索する。
+
+### `/favorites/` — お気に入り一覧
+
+記事カードの ★ で登録したお気に入りを全期間・全カテゴリから横断表示。タグ別記事ページと同じカテゴリ別レイアウトで、テーマ別論文・GitHub Trending・企業動向なども含めて表示する。`favorites` テーブルの `article_id` を JSON データソースと突き合わせて描画する。
 
 ### `/themes` — 検索テーマ一覧・管理
 

@@ -1,0 +1,21 @@
+{#
+  お気に入りスター (star.html)
+  必要変数: article_id, safe_id, is_favorite (bool)
+  HTMX で自分自身 (outerHTML) を入れ替えてトグルする。Alpine には依存しない。
+  注: outerHTML スワップでは応答先頭のノードがそのまま挿入され古いノードが残るため、
+  HTML コメント (<!-- -->) は使わず Jinja コメント (#) で出力に含めない。
+#}
+<button id="fav-star-{{ safe_id }}"
+        hx-post="/favorites/{{ article_id }}"
+        hx-swap="outerHTML"
+        hx-disabled-elt="this"
+        aria-pressed="{{ 'true' if is_favorite else 'false' }}"
+        title="{% if is_favorite %}お気に入りから外す{% else %}お気に入りに追加{% endif %}"
+        class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150 hover:scale-110 active:scale-95 focus:outline-none
+          {% if is_favorite %}text-amber-400 hover:bg-amber-50 hover:text-amber-500{% else %}text-gray-300 hover:bg-amber-50 hover:text-amber-400{% endif %}">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
+       fill="{{ 'currentColor' if is_favorite else 'none' }}" stroke="currentColor" stroke-width="1.8"
+       stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+  </svg>
+</button>

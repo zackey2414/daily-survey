@@ -316,6 +316,14 @@
   - 指定タグを持つ記事を全期間・全カテゴリから横断検索
 - ユーザータグの保存: **SQLite**（`user_tags` テーブル）
 
+#### 3.3.3.1 お気に入り機能
+
+- 各記事カードの ★ ボタンで、記事をお気に入り登録/解除（トグル、HTMX）
+- お気に入りページ（`/favorites/`）:
+  - 登録した記事を全期間・全カテゴリ（テーマ別論文を含む）から横断表示
+  - タグ別記事ページと同じカテゴリ別レイアウト
+- お気に入りの保存: **SQLite**（`favorites` テーブル、`article_id` でユニーク）
+
 #### 3.3.4 日次サマリーフィードページ
 
 - URL: `/summaries?page=N`
@@ -373,7 +381,7 @@
 ```
 ┌──────────────────────────────────────────────────────┐
 │  AI Daily Survey         📅 2026-03-03  [アーカイブ]  │
-│  [今日] [まとめ] [タグ] [テーマ] [チャット履歴]        │
+│  [今日] [まとめ] [タグ] [テーマ] [★お気に入り] [チャット履歴] │
 ├──────────────────────────────────────────────────────┤
 │ ▼ 本日の一面まとめ                                    │
 │  ─────────────────────────────────────────────────── │
@@ -558,6 +566,14 @@ CREATE TABLE user_tags (
     UNIQUE(article_id, tag)
 );
 
+-- お気に入りテーブル（1記事につき1件）
+CREATE TABLE favorites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id  TEXT NOT NULL REFERENCES articles(id),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(article_id)
+);
+
 CREATE INDEX idx_chat_sessions_article ON chat_sessions(article_id);
 CREATE INDEX idx_chat_messages_session ON chat_messages(session_id);
 ```
@@ -590,7 +606,8 @@ everyday-survey/
 │   │   ├── daily_chat.py         # 一面まとめチャット API（/daily-chat/{date_str}/...）
 │   │   ├── themes.py             # 検索テーマ管理（GET /themes, /themes/{id}, /admin/themes/* CRUD）
 │   │   ├── tags.py               # GET /tags/, /tags/{tag_name}
-│   │   └── user_tags.py          # POST/DELETE /user-tags/{article_id}
+│   │   ├── user_tags.py          # POST/DELETE /user-tags/{article_id}
+│   │   └── favorites.py          # GET /favorites/ , POST /favorites/{article_id}（トグル）
 │   ├── services/
 │   │   ├── collector/
 │   │   │   ├── arxiv.py          # arXiv API（cs.CV / cs.LG / cs.AI / cs.CL）
@@ -610,7 +627,7 @@ everyday-survey/
 │   │   └── notifier.py           # SMTP メール通知
 │   ├── db/
 │   │   ├── database.py           # SQLAlchemy async セッション・init_db・migrate_db
-│   │   └── models.py             # ORM モデル（Article, ChatSession, ChatMessage, UserTag）
+│   │   └── models.py             # ORM モデル（Article, ChatSession, ChatMessage, UserTag, Favorite）
 │   └── templates/                # Jinja2 テンプレート
 │       ├── base.html             # 共通レイアウト（ナビ・スティッキーバー JS）
 │       ├── pages/
@@ -619,6 +636,7 @@ everyday-survey/
 │       │   ├── summary_detail.html
 │       │   ├── tags_list.html
 │       │   ├── tags.html
+│       │   ├── favorites.html
 │       │   ├── chat_search.html
 │       │   ├── themes_list.html
 │       │   ├── theme_detail.html
@@ -627,6 +645,7 @@ everyday-survey/
 │           ├── article/          # 記事カード・要約表示・GitHub Trending セクション
 │           ├── chat/             # チャットパネル（記事/一面まとめ）・メッセージ
 │           ├── tags/             # タグ管理 UI
+│           ├── favorite/         # お気に入りスター（HTMX トグル）
 │           └── theme/            # テーマ管理 UI（一覧・キーワード編集）
 │
 ├── data/                         # 日次収集 JSON データ（永続化）
