@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.db.models import UserTag
+from app.db.models import Favorite, UserTag
 from app.jinja import templates
 from app.services.pipeline import load_daily_data, list_available_dates
 from app.schemas import ArticleItem
@@ -87,6 +87,12 @@ async def tag_search(
     # 各カテゴリで合計件数を計算
     total = sum(len(v) for v in results.values())
 
+    # 表示記事のうちお気に入り登録済みの ID を取得（スター初期状態用）
+    favorite_ids: set[str] = set()
+    if seen_ids:
+        fav_stmt = select(Favorite.article_id).where(Favorite.article_id.in_(seen_ids))
+        favorite_ids = {row[0] for row in (await db.execute(fav_stmt)).all()}
+
     return templates.TemplateResponse(
         "pages/tags.html",
         {
@@ -94,6 +100,7 @@ async def tag_search(
             "tag_name": tag_name,
             "results": results,
             "total": total,
+            "favorite_ids": favorite_ids,
             "category_meta": CATEGORY_META,
             "category_order": CATEGORY_ORDER,
         },

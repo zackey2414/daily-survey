@@ -35,6 +35,9 @@ class Article(Base):
     user_tags: Mapped[list["UserTag"]] = relationship(
         "UserTag", back_populates="article", cascade="all, delete-orphan"
     )
+    favorites: Mapped[list["Favorite"]] = relationship(
+        "Favorite", back_populates="article", cascade="all, delete-orphan"
+    )
 
 
 class ChatSession(Base):
@@ -125,3 +128,19 @@ class UserTag(Base):
     article: Mapped["Article"] = relationship("Article", back_populates="user_tags")
 
     __table_args__ = (UniqueConstraint("article_id", "tag"),)
+
+
+class Favorite(Base):
+    """ユーザーがお気に入り登録した記事（1記事につき1件）"""
+
+    __tablename__ = "favorites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[str] = mapped_column(
+        String, ForeignKey("articles.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    article: Mapped["Article"] = relationship("Article", back_populates="favorites")
+
+    __table_args__ = (UniqueConstraint("article_id"),)

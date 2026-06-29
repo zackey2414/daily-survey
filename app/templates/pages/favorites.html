@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}お気に入り — AI Daily Survey{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+    <span class="text-amber-400">★</span> お気に入り
+  </h1>
+  <p class="text-slate-500 text-sm mt-1">{{ total }} 件（全期間・日付降順）</p>
+</div>
+
+{% if total == 0 %}
+<div class="text-center py-16 text-slate-400">
+  <p class="text-5xl mb-4">★</p>
+  <p class="text-lg">まだお気に入りはありません</p>
+  <p class="text-sm mt-1">記事カードの ☆ をクリックするとここに追加されます</p>
+</div>
+{% else %}
+
+{% for cat in category_order %}
+{% set cat_items = results[cat] %}
+{% if cat_items %}
+{% set meta = category_meta[cat] %}
+
+<!-- カテゴリセクション -->
+<section class="mb-8" x-data="{open: true}">
+  <button @click="open = !open"
+          class="w-full flex items-center justify-between rounded-2xl shadow-md overflow-hidden">
+    <div class="w-full flex items-center justify-between relative overflow-hidden
+      {% if cat == 'cv' %}bg-gradient-to-r from-orange-600 to-amber-500
+      {% elif cat == 'theme' %}bg-gradient-to-r from-rose-700 to-rose-500
+      {% elif cat == 'lg' or cat == 'ai' or cat == 'cl' or cat == 'openreview' %}bg-gradient-to-r from-indigo-700 to-indigo-500
+      {% elif cat == 'industry' %}bg-gradient-to-r from-slate-700 to-slate-600
+      {% elif cat == 'community' %}bg-gradient-to-r from-teal-700 to-cyan-600
+      {% elif cat == 'github_trending' %}bg-gradient-to-r from-emerald-700 to-green-500
+      {% else %}bg-gradient-to-r from-blue-800 to-indigo-600{% endif %}
+      text-white px-4 sm:px-6 py-4 sm:py-5">
+      <div class="absolute right-16 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+      <div class="relative flex items-center gap-3">
+        <span class="text-xl sm:text-2xl bg-white/15 p-2 sm:p-2.5 rounded-xl leading-none">{{ meta.icon }}</span>
+        <div>
+          <h2 class="font-bold text-base sm:text-xl tracking-tight">{{ meta.title }}</h2>
+          <p class="text-white/60 text-xs mt-0.5">{{ cat_items|length }} 件</p>
+        </div>
+      </div>
+      <span x-text="open ? '▲' : '▼'" class="relative text-white/50 text-base"></span>
+    </div>
+  </button>
+
+  <div x-show="open" x-cloak class="mt-2 space-y-3">
+    {% for date_str, item in cat_items %}
+    {% set is_paper = meta.is_paper %}
+    <div class="relative">
+      <!-- 日付バッジ -->
+      <div class="absolute -top-2 left-3 z-10">
+        <a href="/archive/{{ date_str }}"
+           class="text-xs bg-gray-700 text-white px-2 py-0.5 rounded-full hover:bg-gray-600 transition">
+          {{ date_str }}
+        </a>
+      </div>
+      {% include "components/article/card.html" %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% endif %}
+{% endfor %}
+
+{% endif %}
+{% endblock %}
